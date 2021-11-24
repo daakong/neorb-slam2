@@ -6,7 +6,7 @@
 
 #IncludeRegexTransform: 
 
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/wrapper.cpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/wrapper.cpp
 climits
 -
 limits
@@ -14,15 +14,15 @@ limits
 complex
 -
 armadillo_bits/config.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/config.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/config.hpp
 armadillo_bits/compiler_setup.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/compiler_setup.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/compiler_setup.hpp
 armadillo_bits/typedef_elem.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/typedef_elem.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/typedef_elem.hpp
 armadillo_bits/include_atlas.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/include_atlas.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/include_atlas.hpp
 armadillo_bits/include_superlu.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/include_superlu.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/include_superlu.hpp
 random
 -
 ctime
@@ -30,17 +30,17 @@ ctime
 sys/time.h
 -
 armadillo_bits/arma_rng_cxx11.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/arma_rng_cxx11.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/arma_rng_cxx11.hpp
 hdf5.h
 -
 armadillo_bits/def_blas.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/def_blas.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/def_blas.hpp
 armadillo_bits/def_lapack.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/def_lapack.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/def_lapack.hpp
 armadillo_bits/def_arpack.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/def_arpack.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/def_arpack.hpp
 armadillo_bits/def_superlu.hpp
-/home/da/active_illum/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/def_superlu.hpp
+/home/da/active/neorb_SLAM2/Thirdparty/3p_env/armadillo-9.200.8/src/armadillo_bits/def_superlu.hpp
 
 tmp/include/armadillo_bits/arma_rng_cxx11.hpp
 

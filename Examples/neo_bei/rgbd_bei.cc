@@ -38,16 +38,9 @@ void LoadImages(const string &strAssociationFilename, vector<string> &vstrImageF
 
 int main(int argc, char **argv)
 {
-    //Initial LOGURU
-    loguru::init(argc, argv);
-
-    // Only log INFO, WARNING, ERROR and FATAL to "latest_readable.log":
-    loguru::add_file("/home/da/active_illum/neo-rgbd_readable.log", loguru::Truncate, loguru::Verbosity_INFO);
-
     if(argc != 5)
     {
-        LOG_S(ERROR) << "Wrong use! " <<
-        "Usage: ./rgbd_tum path_to_vocabulary path_to_settings path_to_sequence path_to_association" ;
+        cerr << endl << "Usage: ./rgbd_tum path_to_vocabulary path_to_settings path_to_sequence path_to_association" << endl;
         return 1;
     }
 
@@ -71,6 +64,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    //Initial LOGURU
+    loguru::init(argc, argv);
+
+    // Only log INFO, WARNING, ERROR and FATAL to "latest_readable.log":
+    loguru::add_file("/home/da/active_illum/neo-rgbd_readable.log", loguru::Truncate, loguru::Verbosity_INFO);
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);

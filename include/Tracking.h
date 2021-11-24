@@ -39,6 +39,7 @@
 #include "System.h"
 
 #include <mutex>
+#include <armadillo>
 
 namespace ORB_SLAM2
 {
@@ -218,6 +219,11 @@ protected:
     void neoTrack();
 
     bool neoBuildInfoMat(Frame &inFrame);
+
+    bool
+    neoComputer_H_subBlock(const cv::Mat &Tcw, const arma::Row<double> &yi, arma::Mat<double> &H13,
+                         arma::Mat<double> &H47,
+                         arma::Mat<double> &dhu_dhrl, const bool check_viz, float &u, float &v);
 };
 
 } //namespace ORB_SLAM

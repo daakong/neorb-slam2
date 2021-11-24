@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 project(ORB_SLAM2)
 
-SET(CMAKE_CXX_STANDARD 11)
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()
@@ -21,8 +20,18 @@ MESSAGE("ARMADILLO libs: " ${ARMADILLO_LIBRARIES})
 
 # Check C++11 or C++0x support
 include(CheckCXXCompilerFlag)
+#CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX17)
+#CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+#if(COMPILER_SUPPORTS_CXX17)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+#add_definitions(-DCOMPILEDWITHC17)
+#message(STATUS "Using flag -std=c++17.")
+#elseif(COMPILER_SUPPORTS_CXX14)
+#   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+#   add_definitions(-DCOMPILEDWITHC14)
+#   message(STATUS "Using flag -std=c++14.")
 if(COMPILER_SUPPORTS_CXX11)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
    add_definitions(-DCOMPILEDWITHC11)
@@ -35,8 +44,13 @@ else()
    message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
 endif()
 
+find_package(Eigen3 3.3 REQUIRED)
+find_package(Pangolin REQUIRED)
+
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 MESSAGE(${CMAKE_MODULE_PATH})
+
+
 
 find_package(OpenCV 3.0 QUIET)
 if(NOT OpenCV_FOUND)
@@ -47,8 +61,6 @@ if(NOT OpenCV_FOUND)
 endif()
 
 
-find_package(Eigen3 3.3 REQUIRED)
-find_package(Pangolin REQUIRED)
 
 include_directories(
 ${PROJECT_SOURCE_DIR}
@@ -88,11 +100,11 @@ src/neo_utility.cpp
 target_link_libraries(${PROJECT_NAME}
 ${OpenCV_LIBS}
 ${EIGEN3_LIBS}
-${ARMADILLO_LIBRARIES}
 ${Pangolin_LIBRARIES}
 ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
-)
+        ${ARMADILLO_LIBRARIES}
+        )
 
 # Build examples
 
@@ -126,10 +138,11 @@ target_link_libraries(mono_kitti ${PROJECT_NAME} )
 
 add_executable(mono_euroc
 Examples/Monocular/mono_euroc.cc)
-target_link_libraries(mono_euroc ${PROJECT_NAME} LOGURU)
+target_link_libraries(mono_euroc ${PROJECT_NAME})
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/ngc)
 
 add_executable(neo_rgbd
         Examples/ngc/rgbd_neo.cc)
 target_link_libraries(neo_rgbd ${PROJECT_NAME})
+

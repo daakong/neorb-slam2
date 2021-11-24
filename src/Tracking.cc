@@ -44,6 +44,7 @@
 
 #include<mutex>
 
+#include "gf_Util.hpp"
 
 using namespace std;
 
@@ -1014,7 +1015,93 @@ bool Tracking::neoBuildInfoMat(Frame &inFrame){
 
     LOG_S(INFO) << "entering neo info map";
 
+    arma::mat H13, H47, H_meas, H_proj, H_disp, H_rw;
+    float res_u = 0, res_v = 0, u, v;
 
+    for(int i = 0; i < inFrame.mvpMapPoints.size(); i++){
+        MapPoint* pMp = inFrame.mvpMapPoints[i];
+
+        if(pMp){
+            if(inFrame.mvbOutlier[i] == false){
+                 // for feature positions
+                arma::rowvec featurePosi = arma::zeros<arma::rowvec>(4);
+                cv::Mat pos = pMp->GetWorldPos();
+                featurePosi[0] = pos.at<float>(0);
+                featurePosi[1] = pos.at<float>(1);
+                featurePosi[2] = pos.at<float>(2);
+                featurePosi[3] = 1;
+
+                //for Measurement positions
+                arma::rowvec measurePosi = arma::zeros<arma::rowvec>(2);
+                cv::KeyPoint kpUn = inFrame.mvKeysUn[i];
+                measurePosi[0] = kpUn.pt.x;
+                measurePosi[1] = kpUn.pt.y;
+
+                bool flag = false;
+// insert h subblock compute
+               flag = Tracking::neoComputer_H_subBlock(inFrame.mTcw, featurePosi.subvec(0,2), H13, H47, H_proj, true, u, v);
+               if(flag){
+                   LOG_S(INFO) << "H computing success. Frame" << inFrame.mnId;
+               }
+               else{
+                   LOG_S(WARNING) << "H computing: something wrong.....frame" << inFrame.mnId;
+               }
+
+            }
+        }
+
+    }
+
+
+
+    return true;
+}
+
+inline bool Tracking::neoComputer_H_subBlock(const cv::Mat &Tcw,
+                                           const arma::rowvec &yi,
+                                           arma::mat &H13, arma::mat &H47,
+                                           arma::mat &dhu_dhrl,
+                                           const bool check_viz,
+                                           float &u, float &v){
+    cv::Mat idMat = cv::Mat::eye(4,4,CV_32F);
+    arma::rowvec Xv;
+
+    convert_Homo_Pair_To_PWLS_Vec(0, idMat, 1, Tcw, Xv);
+    arma::rowvec q_wr = Xv.subvec(3, 6);
+    arma::mat R_rw = arma::inv(q2r(q_wr));
+    arma::rowvec t_rw = yi - Xv.subvec(0, 2);
+
+    float fu = mCurrentFrame.fx;
+    float fv = mCurrentFrame.fy;
+    // dhu_dhrl
+    // lmk @ camera coordinate
+    arma::mat hrl = R_rw * t_rw.t();
+
+    if (fabs(hrl(2, 0)) < 1e-6)
+    {
+        dhu_dhrl = arma::zeros<arma::mat>(2, 3);
+    }
+    else
+    {
+        //        dhu_dhrl << fu/(hrl(2,0))   <<   0.0  <<   -hrl(0,0)*fu/( std::pow(hrl(2,0), 2.0)) << arma::endr
+        //                 << 0.0    <<  fv/(hrl(2,0))   <<  -hrl(1,0)*fv/( std::pow(hrl(2,0), 2.0)) << arma::endr;
+        dhu_dhrl = {{ fu/ (hrl(2, 0)), 0.0, -hrl(0, 0) * fu / (std::pow(hrl(2, 0), 2.0))},
+                    {0.0, fv / (hrl(2, 0)), -hrl(1, 0) * fv / (std::pow(hrl(2, 0), 2.0))}};
+    }
+
+    arma::rowvec qwr_conj = qconj(q_wr);
+
+    // H matrix subblock (cols 1~3): H13
+    H13 = -1.0 * (dhu_dhrl * R_rw);
+
+    arma::colvec v2;
+    v2 << 1.0 << -1.0 << -1.0 << -1.0 << arma::endr;
+    arma::mat dqbar_by_dq = arma::diagmat(v2);
+
+    // H matrix subblock (cols 4~7): H47
+    H47 = dhu_dhrl * (dRq_times_a_by_dq(qwr_conj, t_rw) * dqbar_by_dq);
+
+    return true;
 
 }
 
@@ -1036,7 +1123,7 @@ bool Tracking::TrackReferenceKeyFrame()
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
     mCurrentFrame.SetPose(mLastFrame.mTcw);
 
-
+    neoBuildInfoMat(mCurrentFrame);
 
 
     Optimizer::PoseOptimization(&mCurrentFrame);

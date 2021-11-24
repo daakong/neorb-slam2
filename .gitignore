@@ -17,6 +17,7 @@ Thirdparty/DBoW2/lib/
 Thirdparty/g2o/build/
 Thirdparty/g2o/config.h
 Thirdparty/g2o/lib/
+Thirdparty/3p_env/armadillo-9.200.8/buil/
 Vocabulary/ORBvoc.txt
 build/
 *~
