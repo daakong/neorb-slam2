@@ -1,0 +1,9 @@
+libdir=/opt/armadillo/lib
+includedir=/opt/armadillo/include
+
+Name: armadillo
+Description: Fast C++ matrix library with syntax similar to MATLAB and Octave
+URL: http://arma.sourceforge.net
+Version: 9.200.8
+Cflags: -I${includedir}
+Libs: -L${libdir} -larmadillo

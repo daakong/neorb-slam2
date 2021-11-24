@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -std=c++11 -O2 -O3 -DNDEBUG  -Wl,--no-as-needed -shared -Wl,-soname,libarmadillo.so.9 -o libarmadillo.so.9.200.8 CMakeFiles/armadillo.dir/src/wrapper.cpp.o  -Wl,-rpath,/opt/OpenBLAS/lib: /opt/OpenBLAS/lib/libopenblas.so /opt/OpenBLAS/lib/libopenblas.so 

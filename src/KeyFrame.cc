@@ -23,6 +23,9 @@
 #include "ORBmatcher.h"
 #include<mutex>
 
+#include "neo_utility.h"
+
+
 namespace ORB_SLAM2
 {
 
