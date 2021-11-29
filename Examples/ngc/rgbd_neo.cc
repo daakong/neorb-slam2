@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     loguru::init(argc, argv);
 
     // Only log INFO, WARNING, ERROR and FATAL to "latest_readable.log":
-    loguru::add_file("/home/da/active_illum/neo-rgbd_readable.log", loguru::Truncate, loguru::Verbosity_INFO);
+    loguru::add_file("/home/da/active_illum/neo-everything.log", loguru::Append, loguru::Verbosity_MAX);
 
     if(argc != 5)
     {

@@ -237,8 +237,8 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
 
     mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
-    Track();
-
+//    Track();
+    neoTrack();
     return mCurrentFrame.mTcw.clone();
 }
 
@@ -303,12 +303,14 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
         {
             // System is initialized. Track Frame.
             bool bOK;
+//            LOG_S(INFO) << "Entering0." << mCurrentFrame.mnId << " state" << !(mbOnlyTracking || DISABLE_LOCALMAP);
 
             // Initial camera pose estimation using motion model or relocalization (if tracking is lost)
             if(!(mbOnlyTracking || DISABLE_LOCALMAP))
             {
                 // Local Mapping is activated. This is the normal behaviour, unless
                 // you explicitly activate the "only tracking" mode.
+                LOG_S(INFO) << "Entering here." << mCurrentFrame.mnId;
 
                 if(mState==OK)
                 {
@@ -317,10 +319,12 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
 
                     if(mVelocity.empty() || mCurrentFrame.mnId<mnLastRelocFrameId+2)
                     {
+//                        LOG_S(INFO) << "To track reference frame here." << mCurrentFrame.mnId;
                         bOK = TrackReferenceKeyFrame();
                     }
                     else
                     {
+//                        LOG_S(INFO) << "To track motion model here." << mCurrentFrame.mnId;
                         bOK = TrackWithMotionModel();
                         if(!bOK)
                             bOK = TrackReferenceKeyFrame();
@@ -335,7 +339,6 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
             {
                 // Localization Mode: Local Mapping is deactivated
 
-
                 if(mState==LOST)
                 {
                     bOK = Relocalization();
@@ -348,10 +351,12 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
 
                         if(!mVelocity.empty())
                         {
+//                            LOG_S(INFO) << "To track motion model.";
                             bOK = TrackWithMotionModel();
                         }
                         else
                         {
+//                            LOG_S(INFO) << "To track key frame.";
                             bOK = TrackReferenceKeyFrame();
                         }
 
@@ -409,7 +414,7 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
             mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
             // If we have an initial estimation of the camera pose and matching. Track the local map.
-            if(!mbOnlyTracking)
+            if((!mbOnlyTracking || DISABLE_LOCALMAP))
             {
                 if(bOK)
                     bOK = TrackLocalMap();
@@ -1011,18 +1016,20 @@ void Tracking::CheckReplacedInLastFrame()
     }
 }
 
-bool Tracking::neoBuildInfoMat(Frame &inFrame){
+bool Tracking::neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model, double& score){
 
-    LOG_S(INFO) << "entering neo info map";
+//    LOG_S(INFO) << "entering neo info map";
 
     arma::mat H13, H47, H_meas, H_proj, H_disp, H_rw;
     float res_u = 0, res_v = 0, u, v;
 
+    vector<arma::mat> pointsInfoMatrices;
     for(int i = 0; i < inFrame.mvpMapPoints.size(); i++){
         MapPoint* pMp = inFrame.mvpMapPoints[i];
 
         if(pMp){
             if(inFrame.mvbOutlier[i] == false){
+
                  // for feature positions
                 arma::rowvec featurePosi = arma::zeros<arma::rowvec>(4);
                 cv::Mat pos = pMp->GetWorldPos();
@@ -1040,22 +1047,47 @@ bool Tracking::neoBuildInfoMat(Frame &inFrame){
                 bool flag = false;
 // insert h subblock compute
                flag = Tracking::neoComputer_H_subBlock(inFrame.mTcw, featurePosi.subvec(0,2), H13, H47, H_proj, true, u, v);
+               res_u = measurePosi[0] - u;
+               res_v = measurePosi[1] - v;
+
+               // assemble into H matrix
+                H_meas = arma::join_horiz(H13, H47);
+
+
                if(flag){
-                   LOG_S(INFO) << "H computing success. Frame" << inFrame.mnId;
+//                   LOG_S(INFO) << "H computing success. Frame" << inFrame.mnId;
                }
                else{
                    LOG_S(WARNING) << "H computing: something wrong.....frame" << inFrame.mnId;
                }
 
+                reWeightInfoMat(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw);
+//                LOG_S(INFO) << "H_measure:" << endl << H_meas << endl << "H_rw:" << endl << H_rw;
+                arma::mat point_infoMat = H_rw.t() * H_rw;
+                pointsInfoMatrices.push_back(point_infoMat);
             }
         }
-
     }
+    arma::mat H_c ;
+    for(vector<arma::mat>::iterator iter= pointsInfoMatrices.begin(); iter!=pointsInfoMatrices.end(); iter++){
+        if(iter == pointsInfoMatrices.begin()) {
+            H_c = *iter;
+        }
+        else{
+            H_c = arma::join_vert(H_c, *iter);
+        }
+    }
+//    LOG_S(INFO) << "H_C" << endl << H_c;
+    arma::mat infoMat = H_c.t() * H_c;
+    score = logDet(infoMat);
+    LOG_S(INFO) << "info Mat" << endl << infoMat;
 
+//    LOG_S(INFO) << "Score computing finished. Frame" << inFrame.mnId << " Score:" << score ;
 
 
     return true;
 }
+
 
 inline bool Tracking::neoComputer_H_subBlock(const cv::Mat &Tcw,
                                            const arma::rowvec &yi,
@@ -1123,8 +1155,9 @@ bool Tracking::TrackReferenceKeyFrame()
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
     mCurrentFrame.SetPose(mLastFrame.mTcw);
 
-    neoBuildInfoMat(mCurrentFrame);
-
+    double infoScore = 0;
+    neoBuildInfoMat(mCurrentFrame, false, infoScore);
+    LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
 
     Optimizer::PoseOptimization(&mCurrentFrame);
 
@@ -1239,6 +1272,7 @@ bool Tracking::TrackWithMotionModel()
     int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR);
 
     // If few matches, uses a wider window search
+    //
     if(nmatches<20)
     {
         fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
@@ -1247,6 +1281,11 @@ bool Tracking::TrackWithMotionModel()
 
     if(nmatches<20)
         return false;
+
+    double infoScore = 0;
+    neoBuildInfoMat(mCurrentFrame, true, infoScore);
+    int match_before_discard = nmatches;
+    LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
 
     // Optimize frame pose with all matches
     Optimizer::PoseOptimization(&mCurrentFrame);
@@ -1270,7 +1309,9 @@ bool Tracking::TrackWithMotionModel()
             else if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
                 nmatchesMap++;
         }
-    }    
+    }
+
+//    LOG_S(INFO) << "Frame" << mCurrentFrame.mnId << ", before discard matches" << match_before_discard << ", after discard" << nmatches;
 
     if(mbOnlyTracking)
     {

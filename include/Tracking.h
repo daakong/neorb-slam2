@@ -218,12 +218,66 @@ protected:
 
     void neoTrack();
 
-    bool neoBuildInfoMat(Frame &inFrame);
+    bool neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model, double & score);
 
     bool
     neoComputer_H_subBlock(const cv::Mat &Tcw, const arma::Row<double> &yi, arma::Mat<double> &H13,
                          arma::Mat<double> &H47,
                          arma::Mat<double> &dhu_dhrl, const bool check_viz, float &u, float &v);
+
+    //comes from good feature
+    inline void reWeightInfoMat(const Frame *F, const int &kptIdx, const MapPoint *pMP,
+                                const arma::mat &H_meas, const float &res_u, const float &res_v,
+                                const arma::mat &H_proj, arma::mat &H_rw)
+    {
+
+        int measSz = H_meas.n_rows;
+        arma::mat Sigma_r(measSz, measSz), W_r(measSz, measSz);
+        Sigma_r.eye();
+
+        if (F != NULL && kptIdx >= 0 && kptIdx < F->mvKeysUn.size())
+        {
+            //
+            float Sigma2 = F->mvLevelSigma2[F->mvKeysUn[kptIdx].octave];
+            Sigma_r = Sigma_r * Sigma2;
+
+//            std::cout << Sigma_r ;
+//            std::cout << "sigma2:" << Sigma2 << std::endl;
+
+
+        }
+
+        // cholesky decomp of diagonal-block scaling matrix W
+        if (arma::chol(W_r, Sigma_r, "lower") == true)
+        {
+            // scale the meas. Jacobian with the scaling block W_r
+            H_rw = arma::inv(W_r) * H_meas;
+//            std::cout << H_rw;
+        }
+        else{
+            // do nothing
+                                std::cout << "chol failed!" << std::endl;
+//                                std::cout << "oct level =" << kpUn.octave << "; invSigma2 = " << invSigma2 << std::endl;
+        }
+
+        //#ifdef WITH_QUALITY_WEIGHTED_JACOBIAN
+        //        double quality_max = double(ORBmatcher::TH_HIGH);
+        //#ifdef OBS_DEBUG_VERBOSE
+        //        std::cout << F->mvpMatchScore[i] << std::endl;
+        //        std::cout << H << std::endl;
+        //#endif
+        //        double weight_qual = std::max(0.0, double(quality_max - F->mvpMatchScore[i]) / double(quality_max));
+        //        weight_qual = weight_qual * (1.0 - BASE_WEIGHT_QUAL) + BASE_WEIGHT_QUAL;
+        //        H = H * weight_qual;
+        //#ifdef OBS_DEBUG_VERBOSE
+        //        std::cout << weight_qual << std::endl;
+        //        std::cout << H << std::endl << std::endl << std::endl;
+        //#endif
+        //#endif
+
+    }
+
+
 };
 
 } //namespace ORB_SLAM
