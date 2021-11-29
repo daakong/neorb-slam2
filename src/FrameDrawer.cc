@@ -29,6 +29,7 @@
 namespace ORB_SLAM2
 {
 
+
 FrameDrawer::FrameDrawer(Map* pMap):mpMap(pMap)
 {
     mState=Tracking::SYSTEM_NOT_READY;

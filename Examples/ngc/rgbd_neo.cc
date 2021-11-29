@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     loguru::init(argc, argv);
 
     // Only log INFO, WARNING, ERROR and FATAL to "latest_readable.log":
-    loguru::add_file("/home/da/active_illum/neo-everything.log", loguru::Append, loguru::Verbosity_MAX);
+    loguru::add_file("/home/da/active/neo-everything.log", loguru::Append, loguru::Verbosity_MAX);
 
     if(argc != 5)
     {
@@ -74,6 +74,7 @@ int main(int argc, char **argv)
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);
+//    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD, false); // 不使用可视化界面。
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;

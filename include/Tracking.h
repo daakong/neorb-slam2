@@ -44,6 +44,9 @@
 namespace ORB_SLAM2
 {
 
+
+
+
 class Viewer;
 class FrameDrawer;
 class Map;
@@ -52,7 +55,7 @@ class LoopClosing;
 class System;
 
 class Tracking
-{  
+{
 
 public:
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
@@ -77,6 +80,12 @@ public:
 
 
 public:
+
+    typedef struct DrawKeyNeo {
+        arma::rowvec position;
+        double score;
+    }neodraw;
+
 
     // Tracking states
     enum eTrackingState{
@@ -218,7 +227,8 @@ protected:
 
     void neoTrack();
 
-    bool neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model, double & score);
+    bool neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model,
+                                   double& score, vector<neodraw>& neodraw_vec);
 
     bool
     neoComputer_H_subBlock(const cv::Mat &Tcw, const arma::Row<double> &yi, arma::Mat<double> &H13,
@@ -275,6 +285,48 @@ protected:
         //#endif
         //#endif
 
+    }
+
+    void convert_to_rainbow(double score, cv::Vec3b& pixel){
+        unsigned char grayValue = (unsigned char) score;
+//    cv::Vec3b pixel;
+        if (grayValue <= 51) {
+            pixel[0] = 255;
+            pixel[1] = grayValue * 5;
+            pixel[2] = 0;
+        }
+        else if (grayValue <= 102)
+        {
+            grayValue -= 51;
+            pixel[0] = 255 - grayValue * 5;
+            pixel[1] = 255;
+            pixel[2] = 0;
+        }
+        else if (grayValue <= 153)
+        {
+            grayValue -= 102;
+            pixel[0] = 0;
+            pixel[1] = 255;
+            pixel[2] = grayValue * 5;
+        }
+        else if (grayValue <= 204)
+        {
+            grayValue -= 153;
+            pixel[0] = 0;
+            pixel[1] = 255 - static_cast
+                    <unsigned char>(grayValue
+                                    * 128.0 / 51 + 0.5);
+            pixel[2] = 255;
+        }
+        else if (grayValue <= 255)
+        {
+            grayValue -= 204;
+            pixel[0] = 0;
+            pixel[1] = 127 - static_cast
+                    <unsigned char>(grayValue
+                                    * 127.0 / 51 + 0.5);
+            pixel[2] = 255;
+        }
     }
 
 
