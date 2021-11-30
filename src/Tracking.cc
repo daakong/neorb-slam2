@@ -1027,7 +1027,44 @@ namespace ORB_SLAM2 {
         vector<neodraw> neodraw_inframe;
         double infoScore = 0;
         neoBuildInfoMat(mCurrentFrame, false, infoScore, neodraw_inframe);
-        LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
+//        LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
+
+        cv::Mat img_out;
+        cv::Mat img_in;
+//    mImGray.copyTo(img_in);
+        cv::cvtColor(mImGray, img_in, CV_GRAY2BGR);
+
+//    cv::drawKeypoints(mImGray,
+//                      mCurrentFrame.mvKeys,
+//                      out_img,
+//                      cv::Scalar(0,0,255),
+//                      cv::DrawMatchesFlags::DEFAULT);
+
+        for(vector<neodraw>::iterator iter = neodraw_inframe.begin(); iter!= neodraw_inframe.end(); iter++){
+            double color = (-iter->score );
+            cv::Vec3b color_BRG;
+            convert_to_rainbow(color,color_BRG);
+//        LOG_S(INFO) << "SCORE SINGLE" << color;
+            cv::circle(img_in, cv::Point(iter->position[0],iter->position[1]), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+
+            // 在最后一次迭代中， 加入上限、下限的颜色
+            if(iter == neodraw_inframe.begin()){
+                convert_to_rainbow(0, color_BRG);
+                cv::circle(img_in, cv::Point(10,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+
+                convert_to_rainbow(255, color_BRG);
+                cv::circle(img_in, cv::Point(20,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+            }
+
+        }
+
+
+//    cv::imshow("key_in",img_in);
+        ostringstream file_name;
+        file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
+        flip(img_in,img_out,-1); //翻转图片
+        cv::imwrite(file_name.str(), img_out);
+
 
         Optimizer::PoseOptimization(&mCurrentFrame);
 
@@ -1190,7 +1227,13 @@ bool Tracking::TrackWithMotionModel()
     ostringstream file_name;
     file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
     flip(img_in,img_out,-1); //翻转图片
+    ostringstream text;
+    text << "Points:" << nmatches << ",score:" << infoScore;
+    cv::Vec3b color_BRG;
+    convert_to_rainbow(255, color_BRG);
+    cv::putText(img_out, text.str(), cv::Point(50, 50), cv::FONT_HERSHEY_PLAIN,0.7, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]), 2);
     cv::imwrite(file_name.str(), img_out);
+
     // Optimize frame pose with all matches
     Optimizer::PoseOptimization(&mCurrentFrame);
 

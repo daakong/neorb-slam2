@@ -71,10 +71,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
-
+   bool enable_visualization = false;
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);
-//    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD, false); // 不使用可视化界面。
+//    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);
+    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD, enable_visualization); // 不使用可视化界面。
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
@@ -107,6 +107,9 @@ int main(int argc, char **argv)
         std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
 
+        if(!enable_visualization){
+            LOG_S(WARNING) << "To track frame" << ni << "!!!";
+        }
         // Pass the image to the SLAM system
         SLAM.TrackRGBD(imRGB,imD,tframe);
 
