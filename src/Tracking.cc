@@ -190,8 +190,8 @@ namespace ORB_SLAM2 {
         mCurrentFrame = Frame(mImGray, imGrayRight, timestamp, mpORBextractorLeft, mpORBextractorRight, mpORBVocabulary,
                               mK, mDistCoef, mbf, mThDepth);
 
-        Track();
-
+//        Track();
+        neoTrack();
         return mCurrentFrame.mTcw.clone();
     }
 
@@ -282,7 +282,7 @@ namespace ORB_SLAM2 {
             if (!(mbOnlyTracking || DISABLE_LOCALMAP)) {
                 // Local Mapping is activated. This is the normal behaviour, unless
                 // you explicitly activate the "only tracking" mode.
-                LOG_S(INFO) << "Entering here." << mCurrentFrame.mnId;
+//                LOG_S(INFO) << "Entering here." << mCurrentFrame.mnId;
 
                 if (mState == OK) {
                     // Local Mapping might have changed some MapPoints tracked in last frame
@@ -1226,12 +1226,16 @@ bool Tracking::TrackWithMotionModel()
 //    cv::imshow("key_in",img_in);
     ostringstream file_name;
     file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
+#ifdef FLIP_IMG
     flip(img_in,img_out,-1); //翻转图片
+#else
+    img_out = img_in.clone();
+#endif
     ostringstream text;
     text << "Points:" << nmatches << ",score:" << infoScore;
     cv::Vec3b color_BRG;
     convert_to_rainbow(255, color_BRG);
-    cv::putText(img_out, text.str(), cv::Point(50, 50), cv::FONT_HERSHEY_PLAIN,0.7, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]), 2);
+    cv::putText(img_out, text.str(), cv::Point(50, 50), cv::FONT_HERSHEY_PLAIN,0.8, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]), 2);
     cv::imwrite(file_name.str(), img_out);
 
     // Optimize frame pose with all matches

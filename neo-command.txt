@@ -1,0 +1,10 @@
+neo-rgbd: 输入指令
+
+/home/da/active/neorb_SLAM2/Vocabulary/ORBvoc.bin
+/home/da/active/neorb_SLAM2/Examples/ngc/neo-kinect2.yaml
+/home/da/active/data/office-light/rgb-d
+/home/da/active/data/office-light/rgb-d/associated.txt
+
+
+
+neo-stereo：输入指令

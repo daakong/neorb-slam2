@@ -146,6 +146,10 @@ add_executable(neo_rgbd
         Examples/ngc/rgbd_neo.cc)
 target_link_libraries(neo_rgbd ${PROJECT_NAME})
 
+add_executable(neo_stereo
+        Examples/ngc/neo_stereo.cc)
+target_link_libraries(neo_stereo ${PROJECT_NAME})
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/tools)
 add_executable(bin_vocabulary
         tools/bin_vocabulary.cc)

@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 #endif
 
         if(!enable_visualization){
-            LOG_S(WARNING) << "To track frame" << ni << "!!!";
+            LOG_S(INFO) << "To track frame" << ni << "!!!";
         }
         // Pass the image to the SLAM system
         SLAM.TrackRGBD(imRGB,imD,tframe);
@@ -149,8 +149,8 @@ int main(int argc, char **argv)
     cout << "mean tracking time: " << totaltime/nImages << endl;
 
     // Save camera trajectory
-    SLAM.SaveTrajectoryTUM("CameraTrajectory.txt");
-    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+    SLAM.SaveTrajectoryTUM("traj/CameraTrajectory.txt");
+    SLAM.SaveKeyFrameTrajectoryTUM("traj/KeyFrameTrajectory.txt");
 
     return 0;
 }

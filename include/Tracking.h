@@ -287,7 +287,7 @@ protected:
 
     }
 
-    void convert_to_rainbow(double score, cv::Vec3b& pixel){
+    inline void convert_to_rainbow(double score, cv::Vec3b& pixel){
         unsigned char grayValue = (unsigned char) score;
 //    cv::Vec3b pixel;
         if (grayValue <= 51) {
