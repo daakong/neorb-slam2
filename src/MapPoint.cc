@@ -417,5 +417,24 @@ int MapPoint::PredictScale(const float &currentDist, Frame* pF)
 }
 
 
+MapPointWithScore::MapPointWithScore(MapPoint *pMp, float score_in, float u_in, float v_in) {
+    target_pmpl = pMp;
+    score= score_in;
+    u = u_in;
+    v = v_in;
+}
+
+MapPoint *MapPointWithScore::GetPMP() {
+        return  target_pmpl;
+}
+
+bool MapPointWithScore::SetScore(float in) {
+    score = in;
+}
+
+bool MapPointWithScore::SetPMP(MapPoint *pMp) {
+         target_pmpl = pMp;
+        return  true;
+}
 
 } //namespace ORB_SLAM

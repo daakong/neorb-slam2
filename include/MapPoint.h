@@ -147,6 +147,23 @@ protected:
      std::mutex mMutexFeatures;
 };
 
+
+class  MapPointWithScore{
+public: MapPointWithScore(MapPoint* pMp, float score_in, float u_in, float v_in);
+
+    MapPoint* GetPMP();
+    float GetScore();
+    bool SetScore(float in);
+    bool SetPMP(MapPoint *pMp);
+
+public:
+    MapPoint* target_pmpl;
+    float score;
+    float u;
+    float v;
+
+};
+
 } //namespace ORB_SLAM
 
 #endif // MAPPOINT_H

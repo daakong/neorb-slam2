@@ -72,6 +72,14 @@ public:
     // Returns the camera pose (empty if tracking fails).
     cv::Mat TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
 
+    //this is neorb neo track.!!
+
+    cv::Mat neoTrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp, const cv::Mat &im_last,
+                         const cv::Mat &depth_last);
+    cv::Mat neoTrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
+
+
+
     // Proccess the given monocular frame
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
@@ -174,6 +182,8 @@ private:
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
+
+
 };
 
 }// namespace ORB_SLAM

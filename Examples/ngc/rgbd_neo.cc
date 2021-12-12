@@ -87,6 +87,7 @@ int main(int argc, char **argv)
 
     // Main loop
     cv::Mat imRGB, imD;
+    cv::Mat exframe_imRGB, exframe_imD;
     for(int ni=0; ni<nImages; ni++)
     {
         // Read image and depthmap from file
@@ -112,6 +113,14 @@ int main(int argc, char **argv)
         }
         // Pass the image to the SLAM system
         SLAM.TrackRGBD(imRGB,imD,tframe);
+        if(ni == 0) {
+            SLAM.neoTrackRGBD(imRGB, imD, tframe);
+        }
+        else{
+            SLAM.neoTrackRGBD(imRGB, imD, tframe, exframe_imRGB, exframe_imD);
+        }
+        imD.copyTo(exframe_imD);
+        imRGB.copyTo(exframe_imRGB);
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -132,6 +141,7 @@ int main(int argc, char **argv)
 
         if(ttrack<T)
             usleep((T-ttrack)*1e6);
+
     }
 
     // Stop all threads

@@ -43,6 +43,10 @@ public:
     // Computes the Hamming distance between two ORB descriptors
     static int DescriptorDistance(const cv::Mat &a, const cv::Mat &b);
 
+   // For NEORB-SLAM, we build a vector to connect the map pont in consecutive frames.
+    int SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, const float th, const bool bMono,
+                           vector<MapPointWithScore> &MapPoints_LastFrame);
+
     // Search matches between Frame keypoints and projected MapPoints. Returns number of matches
     // Used to track the local map (Tracking)
     int SearchByProjection(Frame &F, const std::vector<MapPoint*> &vpMapPoints, const float th=3);
@@ -99,6 +103,7 @@ protected:
 
     float mfNNratio;
     bool mbCheckOrientation;
+
 };
 
 }// namespace ORB_SLAM

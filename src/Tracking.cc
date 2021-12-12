@@ -165,6 +165,7 @@ namespace ORB_SLAM2 {
     }
 
 
+
     cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp) {
         mImGray = imRectLeft;
         cv::Mat imGrayRight = imRectRight;
@@ -191,7 +192,7 @@ namespace ORB_SLAM2 {
                               mK, mDistCoef, mbf, mThDepth);
 
 //        Track();
-        neoTrack();
+//        neoTrack();
         return mCurrentFrame.mTcw.clone();
     }
 
@@ -219,10 +220,37 @@ namespace ORB_SLAM2 {
                               mThDepth);
 
 //    Track();
-        neoTrack();
+        neoRGBD_Track(false, imRGB, imDepth);
         return mCurrentFrame.mTcw.clone();
     }
 
+    cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp,
+                                    const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe) {
+        mImGray = imRGB;
+        cv::Mat imDepth = imD;
+
+        if (mImGray.channels() == 3) {
+            if (mbRGB)
+                cvtColor(mImGray, mImGray, CV_RGB2GRAY);
+            else
+                cvtColor(mImGray, mImGray, CV_BGR2GRAY);
+        } else if (mImGray.channels() == 4) {
+            if (mbRGB)
+                cvtColor(mImGray, mImGray, CV_RGBA2GRAY);
+            else
+                cvtColor(mImGray, mImGray, CV_BGRA2GRAY);
+        }
+
+        if ((fabs(mDepthMapFactor - 1.0f) > 1e-5) || imDepth.type() != CV_32F)
+            imDepth.convertTo(imDepth, CV_32F, mDepthMapFactor);
+
+        mCurrentFrame = Frame(mImGray, imDepth, timestamp, mpORBextractorLeft, mpORBVocabulary, mK, mDistCoef, mbf,
+                              mThDepth);
+
+//    Track();
+        neoRGBD_Track(true, imLastframe, imDepthLastframe);
+        return mCurrentFrame.mTcw.clone();
+    }
 
     cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp) {
         mImGray = im;
@@ -250,7 +278,7 @@ namespace ORB_SLAM2 {
         return mCurrentFrame.mTcw.clone();
     }
 
-    void Tracking::neoTrack() {
+    void Tracking::neoRGBD_Track(bool if_has_exframe, const cv::Mat &exframe_rgb, const cv::Mat & exframe_depth) {
         if (mState == NO_IMAGES_YET) {
             mState = NOT_INITIALIZED;
         }
@@ -282,7 +310,7 @@ namespace ORB_SLAM2 {
             if (!(mbOnlyTracking || DISABLE_LOCALMAP)) {
                 // Local Mapping is activated. This is the normal behaviour, unless
                 // you explicitly activate the "only tracking" mode.
-//                LOG_S(INFO) << "Entering here." << mCurrentFrame.mnId;
+                LOG_S(INFO) << "Entering here." << mCurrentFrame.mnId;
 
                 if (mState == OK) {
                     // Local Mapping might have changed some MapPoints tracked in last frame
@@ -290,12 +318,16 @@ namespace ORB_SLAM2 {
 
                     if (mVelocity.empty() || mCurrentFrame.mnId < mnLastRelocFrameId + 2) {
 //                        LOG_S(INFO) << "To track reference frame here." << mCurrentFrame.mnId;
-                        bOK = TrackReferenceKeyFrame();
+//                        bOK = TrackReferenceKeyFrame();
+                        bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth);
                     } else {
 //                        LOG_S(INFO) << "To track motion model here." << mCurrentFrame.mnId;
-                        bOK = TrackWithMotionModel();
-                        if (!bOK)
-                            bOK = TrackReferenceKeyFrame();
+//                        bOK = TrackWithMotionModel();
+                        bOK = neoTrackWithMotionModel(if_has_exframe, exframe_rgb, exframe_depth);
+                        if (!bOK){
+//                            bOK = TrackReferenceKeyFrame();
+                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth);
+                        }
                     }
                 } else {
                     bOK = Relocalization();
@@ -311,10 +343,12 @@ namespace ORB_SLAM2 {
 
                         if (!mVelocity.empty()) {
 //                            LOG_S(INFO) << "To track motion model.";
-                            bOK = TrackWithMotionModel();
+//                            bOK = TrackWithMotionModel();
+                            bOK = neoTrackWithMotionModel(if_has_exframe, exframe_rgb, exframe_depth);
                         } else {
 //                            LOG_S(INFO) << "To track key frame.";
-                            bOK = TrackReferenceKeyFrame();
+                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth);
+//                            bOK = TrackReferenceKeyFrame();
                         }
 
 
@@ -885,7 +919,10 @@ namespace ORB_SLAM2 {
 
     bool Tracking::neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model,
                                    double &score, vector<neodraw> &neodraw_vec) {
-
+    // old frame-to-local-map archieve...
+    //this code is abandoned.
+        LOG_S(ERROR)<< "Your are using abandoned code!!";
+        return false;
 //    LOG_S(INFO) << "entering neo info map";
 
         arma::mat H13, H47, H_meas, H_proj, H_disp, H_rw;
@@ -917,7 +954,7 @@ namespace ORB_SLAM2 {
                     bool flag = false;
 
                     // insert h subblock compute
-                    flag = Tracking::neoComputer_H_subBlock(inFrame.mTcw, featurePosi.subvec(0, 2), H13, H47, H_proj,
+                    flag = Tracking::Computer_H_subBlock(inFrame.mTcw, featurePosi.subvec(0, 2), H13, H47, H_proj,
                                                             true, u, v);
                     res_u = measurePosi[0] - u;
                     res_v = measurePosi[1] - v;
@@ -962,12 +999,93 @@ namespace ORB_SLAM2 {
     }
 
 
-    inline bool Tracking::neoComputer_H_subBlock(const cv::Mat &Tcw,
-                                                 const arma::rowvec &yi,
-                                                 arma::mat &H13, arma::mat &H47,
-                                                 arma::mat &dhu_dhrl,
-                                                 const bool check_viz,
-                                                 float &u, float &v) {
+    bool Tracking::neoBuildInfoMat(Frame &inFrame, Frame &exFrame, bool call_from_motion_model,
+                                   double &score, vector<neodraw> &neodraw_vec) {
+
+//    LOG_S(INFO) << "entering neo info map";
+
+        arma::mat H13, H47, H_meas, H_proj, H_disp, H_rw;
+        float res_u = 0, res_v = 0, u, v;
+
+        vector<arma::mat> pointsInfoMatrices;
+        for (int i = 0; i < inFrame.mvpMapPoints.size(); i++) {
+            MapPoint *pMp = inFrame.mvpMapPoints[i];
+
+            if (pMp) {
+                if (inFrame.mvbOutlier[i] == false) {
+
+                    neodraw drawPoint;
+                    // for feature positions
+                    arma::rowvec featurePosi = arma::zeros<arma::rowvec>(4);
+                    cv::Mat pos = pMp->GetWorldPos();
+                    featurePosi[0] = pos.at<float>(0);
+                    featurePosi[1] = pos.at<float>(1);
+                    featurePosi[2] = pos.at<float>(2);
+                    featurePosi[3] = 1;
+
+                    //for Measurement positions
+                    arma::rowvec measurePosi = arma::zeros<arma::rowvec>(2);
+                    cv::KeyPoint kpUn = inFrame.mvKeysUn[i];
+                    measurePosi[0] = kpUn.pt.x;
+                    measurePosi[1] = kpUn.pt.y;
+                    drawPoint.position = measurePosi;
+
+                    bool flag = false;
+
+
+
+                    // insert h subblock compute
+                    flag = Tracking::neoGet_H_subBlock(inFrame.mTcw, featurePosi.subvec(0, 2), H13, H47, H_proj,
+                                                            true, u, v);
+                    res_u = measurePosi[0] - u;
+                    res_v = measurePosi[1] - v;
+
+                    // assemble into H matrix
+                    H_meas = arma::join_horiz(H13, H47);
+
+
+                    if (flag) {
+//                   LOG_S(INFO) << "H computing success. Frame" << inFrame.mnId;
+                    } else {
+                        LOG_S(WARNING) << "H computing: something wrong.....frame" << inFrame.mnId;
+                    }
+
+                    reWeightInfoMat(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw);
+//                LOG_S(INFO) << "H_measure:" << endl << H_meas << endl << "H_rw:" << endl << H_rw;
+                    arma::mat point_infoMat = H_rw.t() * H_rw;
+                    double single_point_score = logDet(point_infoMat);
+                    drawPoint.score = single_point_score;
+                    pointsInfoMatrices.push_back(point_infoMat);
+                    neodraw_vec.push_back(drawPoint);
+                }
+            }
+        }
+        arma::mat H_c;
+        for (vector<arma::mat>::iterator iter = pointsInfoMatrices.begin(); iter != pointsInfoMatrices.end(); iter++) {
+            if (iter == pointsInfoMatrices.begin()) {
+                H_c = *iter;
+            } else {
+                H_c = arma::join_vert(H_c, *iter);
+            }
+        }
+//    LOG_S(INFO) << "H_C" << endl << H_c;
+        arma::mat infoMat = H_c.t() * H_c;
+        score = logDet(infoMat);
+        LOG_S(INFO) << "info Mat" << endl << infoMat;
+
+//    LOG_S(INFO) << "Score computing finished. Frame" << inFrame.mnId << " Score:" << score ;
+
+
+        return true;
+    }
+
+    inline bool Tracking::neoGet_H_subBlock(const cv::Mat &Tcw,
+                                              const arma::rowvec &yi,
+                                              arma::mat &H13, arma::mat &H47,
+                                              arma::mat &dhu_dhrl,
+                                              const bool check_viz,
+                                              float &u, float &v) {
+
         cv::Mat idMat = cv::Mat::eye(4, 4, CV_32F);
         arma::rowvec Xv;
 
@@ -1007,6 +1125,137 @@ namespace ORB_SLAM2 {
 
     }
 
+    inline bool Tracking::Computer_H_subBlock(const cv::Mat &Tcw,
+                                                 const arma::rowvec &yi,
+                                                 arma::mat &H13, arma::mat &H47,
+                                                 arma::mat &dhu_dhrl,
+                                                 const bool check_viz,
+                                                 float &u, float &v) {
+        /// THis is the original code from good feature.
+        // This part is abandoned now.!
+        LOG_S(ERROR) << "You are running abandoned code!!";
+
+        cv::Mat idMat = cv::Mat::eye(4, 4, CV_32F);
+        arma::rowvec Xv;
+
+        convert_Homo_Pair_To_PWLS_Vec(0, idMat, 1, Tcw, Xv);
+        arma::rowvec q_wr = Xv.subvec(3, 6);
+        arma::mat R_rw = arma::inv(q2r(q_wr));
+        arma::rowvec t_rw = yi - Xv.subvec(0, 2);
+
+        float fu = mCurrentFrame.fx;
+        float fv = mCurrentFrame.fy;
+        // dhu_dhrl
+        // lmk @ camera coordinate
+        arma::mat hrl = R_rw * t_rw.t();
+
+        if (fabs(hrl(2, 0)) < 1e-6) {
+            dhu_dhrl = arma::zeros<arma::mat>(2, 3);
+        } else {
+            //        dhu_dhrl << fu/(hrl(2,0))   <<   0.0  <<   -hrl(0,0)*fu/( std::pow(hrl(2,0), 2.0)) << arma::endr
+            //                 << 0.0    <<  fv/(hrl(2,0))   <<  -hrl(1,0)*fv/( std::pow(hrl(2,0), 2.0)) << arma::endr;
+            dhu_dhrl = {{fu / (hrl(2, 0)), 0.0,              -hrl(0, 0) * fu / (std::pow(hrl(2, 0), 2.0))},
+                        {0.0,              fv / (hrl(2, 0)), -hrl(1, 0) * fv / (std::pow(hrl(2, 0), 2.0))}};
+        }
+
+        arma::rowvec qwr_conj = qconj(q_wr);
+
+        // H matrix subblock (cols 1~3): H13
+        H13 = -1.0 * (dhu_dhrl * R_rw);
+
+        arma::colvec v2;
+        v2 << 1.0 << -1.0 << -1.0 << -1.0 << arma::endr;
+        arma::mat dqbar_by_dq = arma::diagmat(v2);
+
+        // H matrix subblock (cols 4~7): H47
+        H47 = dhu_dhrl * (dRq_times_a_by_dq(qwr_conj, t_rw) * dqbar_by_dq);
+
+        return true;
+
+    }
+
+    bool Tracking::neoTrackReferenceKeyFrame(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth) {
+        // Compute Bag of Words vector
+        mCurrentFrame.ComputeBoW();
+
+        // We perform first an ORB matching with the reference keyframe
+        // If enough matches are found we setup a PnP solver
+        ORBmatcher matcher(0.7, true);
+        vector<MapPoint *> vpMapPointMatches;
+
+        int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
+
+        if (nmatches < 15)
+            return false;
+
+        mCurrentFrame.mvpMapPoints = vpMapPointMatches;
+        mCurrentFrame.SetPose(mLastFrame.mTcw);
+
+        vector<neodraw> neodraw_inframe;
+        double infoScore = 0;
+        neoBuildInfoMat(mCurrentFrame, mLastFrame, false, infoScore, neodraw_inframe);
+//        LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
+
+        cv::Mat img_out;
+        cv::Mat img_in;
+//    mImGray.copyTo(img_in);
+        cv::cvtColor(mImGray, img_in, CV_GRAY2BGR);
+
+//    cv::drawKeypoints(mImGray,
+//                      mCurrentFrame.mvKeys,
+//                      out_img,
+//                      cv::Scalar(0,0,255),
+//                      cv::DrawMatchesFlags::DEFAULT);
+
+        for(vector<neodraw>::iterator iter = neodraw_inframe.begin(); iter!= neodraw_inframe.end(); iter++){
+            double color = (-iter->score );
+            cv::Vec3b color_BRG;
+            convert_to_rainbow(color,color_BRG);
+//        LOG_S(INFO) << "SCORE SINGLE" << color;
+            cv::circle(img_in, cv::Point(iter->position[0],iter->position[1]), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+
+            // 在最后一次迭代中， 加入上限、下限的颜色
+            if(iter == neodraw_inframe.begin()){
+                convert_to_rainbow(0, color_BRG);
+                cv::circle(img_in, cv::Point(10,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+
+                convert_to_rainbow(255, color_BRG);
+                cv::circle(img_in, cv::Point(20,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+            }
+
+        }
+
+
+//    cv::imshow("key_in",img_in);
+        ostringstream file_name;
+        file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
+        flip(img_in,img_out,-1); //翻转图片
+        cv::imwrite(file_name.str(), img_out);
+
+
+        Optimizer::PoseOptimization(&mCurrentFrame);
+
+        // Discard outliers
+        int nmatchesMap = 0;
+        for (int i = 0; i < mCurrentFrame.N; i++) {
+            if (mCurrentFrame.mvpMapPoints[i]) {
+                if (mCurrentFrame.mvbOutlier[i]) {
+                    MapPoint *pMP = mCurrentFrame.mvpMapPoints[i];
+
+                    mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint *>(NULL);
+                    mCurrentFrame.mvbOutlier[i] = false;
+                    pMP->mbTrackInView = false;
+                    pMP->mnLastFrameSeen = mCurrentFrame.mnId;
+                    nmatches--;
+                } else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
+                    nmatchesMap++;
+            }
+        }
+
+        return nmatchesMap >= 10;
+    }
+
+
     bool Tracking::TrackReferenceKeyFrame() {
         // Compute Bag of Words vector
         mCurrentFrame.ComputeBoW();
@@ -1026,7 +1275,7 @@ namespace ORB_SLAM2 {
 
         vector<neodraw> neodraw_inframe;
         double infoScore = 0;
-        neoBuildInfoMat(mCurrentFrame, false, infoScore, neodraw_inframe);
+        neoBuildInfoMat(mCurrentFrame, mLastFrame, false, infoScore, neodraw_inframe);
 //        LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
 
         cv::Mat img_out;
@@ -1156,6 +1405,162 @@ void Tracking::UpdateLastFrame()
     }
 }
 
+bool Tracking::neoComputeLastFrameScore(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth, vector<MapPointWithScore> & lastMp_score)
+{
+        //// This is for RGB-D...
+        //// Stereo mode may need modification.
+        if (!if_has_exframe){
+            LOG_S(ERROR) << "HAS EXFRAME IS FALSE!!";
+            return false;
+        }
+        cv::Mat img_gray, img_grad;
+        cv::cvtColor(lastimRGB, img_gray, CV_RGB2GRAY);
+         cv::Sobel( img_gray, img_grad, -1,
+                    1, 1
+//                ,int ksize = 3, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT
+                   );
+         cv::imwrite("/home/da/img_grad.png", img_grad);
+        int fsize = lastMp_score.size();
+        for(int i0 = 0; i0 < fsize; i0++ ){
+            float score = -1;
+            MapPoint * pmp_tmp = lastMp_score[i0].GetPMP();
+            int u_tmp = (int) lastMp_score[i0].u;
+            int v_tmp = (int) lastMp_score[i0].v;
+
+
+            lastMp_score[i0].SetScore(score);
+
+
+            //computer gradient images
+
+
+
+        }
+        return true;
+}
+
+bool Tracking::neoTrackWithMotionModel(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth)
+{
+    ORBmatcher matcher(0.9,true);
+
+    // Update last frame pose according to its reference keyframe
+    // Create "visual odometry" points if in Localization Mode
+    UpdateLastFrame();
+
+    mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+
+    fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
+
+    vector<MapPointWithScore> mpwithScore_last;
+//    fill(mpwithScore.begin(), mpwithScore.end(), static_cast<MapPointWithScore*>(NULL));
+    // Project points seen in previous frame
+    int th;
+    if(mSensor!=System::STEREO)
+        th=15;
+    else
+        th=7;
+    int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR,mpwithScore_last);
+
+    // If few matches, uses a wider window search
+    //
+    if(nmatches<20)
+    {
+        fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
+        nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th,mSensor==System::MONOCULAR, mpwithScore_last);
+    }
+
+    if(nmatches<20)
+        return false;
+
+    int mpscore_size = mpwithScore_last.size();
+    LOG_S(INFO) << "mpscore size:" << mpscore_size;
+    neoComputeLastFrameScore(if_has_exframe, lastimRGB, lastimDepth, mpwithScore_last);
+
+    vector<neodraw> neodraw_inframe;
+    double infoScore = 0;
+    neoBuildInfoMat(mCurrentFrame, mLastFrame,true, infoScore, neodraw_inframe);
+    int match_before_discard = nmatches;
+//    LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
+
+    cv::Mat img_out;
+    cv::Mat img_in;
+//    mImGray.copyTo(img_in);
+    cv::cvtColor(mImGray, img_in, CV_GRAY2BGR);
+
+//    cv::drawKeypoints(mImGray,
+//                      mCurrentFrame.mvKeys,
+//                      out_img,
+//                      cv::Scalar(0,0,255),
+//                      cv::DrawMatchesFlags::DEFAULT);
+
+    for(vector<neodraw>::iterator iter = neodraw_inframe.begin(); iter!= neodraw_inframe.end(); iter++){
+        double color = (-iter->score );
+        cv::Vec3b color_BRG;
+        convert_to_rainbow(color,color_BRG);
+//        LOG_S(INFO) << "SCORE SINGLE" << color;
+        cv::circle(img_in, cv::Point(iter->position[0],iter->position[1]), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+
+        // 在最后一次迭代中， 加入上限、下限的颜色
+        if(iter == neodraw_inframe.begin()){
+            convert_to_rainbow(0, color_BRG);
+            cv::circle(img_in, cv::Point(10,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+
+            convert_to_rainbow(255, color_BRG);
+            cv::circle(img_in, cv::Point(20,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+        }
+
+    }
+
+
+//    cv::imshow("key_in",img_in);
+    ostringstream file_name;
+    file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
+#ifdef FLIP_IMG
+    flip(img_in,img_out,-1); //翻转图片
+#else
+    img_out = img_in.clone();
+#endif
+    ostringstream text;
+    text << "Points:" << nmatches << ",score:" << infoScore;
+    cv::Vec3b color_BRG;
+    convert_to_rainbow(255, color_BRG);
+    cv::putText(img_out, text.str(), cv::Point(50, 50), cv::FONT_HERSHEY_PLAIN,0.8, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]), 2);
+    cv::imwrite(file_name.str(), img_out);
+
+    // Optimize frame pose with all matches
+    Optimizer::PoseOptimization(&mCurrentFrame);
+
+    // Discard outliers
+    int nmatchesMap = 0;
+    for(int i =0; i<mCurrentFrame.N; i++)
+    {
+        if(mCurrentFrame.mvpMapPoints[i])
+        {
+            if(mCurrentFrame.mvbOutlier[i])
+            {
+                MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
+
+                mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
+                mCurrentFrame.mvbOutlier[i]=false;
+                pMP->mbTrackInView = false;
+                pMP->mnLastFrameSeen = mCurrentFrame.mnId;
+                nmatches--;
+            }
+            else if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
+                nmatchesMap++;
+        }
+    }
+
+//    LOG_S(INFO) << "Frame" << mCurrentFrame.mnId << ", before discard matches" << match_before_discard << ", after discard" << nmatches;
+
+    if(mbOnlyTracking)
+    {
+        mbVO = nmatchesMap<10;
+        return nmatches>20;
+    }
+
+    return nmatchesMap>=10;
+}
 bool Tracking::TrackWithMotionModel()
 {
     ORBmatcher matcher(0.9,true);
@@ -1168,28 +1573,34 @@ bool Tracking::TrackWithMotionModel()
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
+    vector<MapPointWithScore> mpwithScore_last;
+//    fill(mpwithScore.begin(), mpwithScore.end(), static_cast<MapPointWithScore*>(NULL));
     // Project points seen in previous frame
     int th;
     if(mSensor!=System::STEREO)
         th=15;
     else
         th=7;
-    int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR);
+    int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR,mpwithScore_last);
 
     // If few matches, uses a wider window search
     //
     if(nmatches<20)
     {
         fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
-        nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th,mSensor==System::MONOCULAR);
+        nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th,mSensor==System::MONOCULAR, mpwithScore_last);
     }
 
     if(nmatches<20)
         return false;
 
+    int mpscore_size = mpwithScore_last.size();
+    LOG_S(INFO) << "mpscore size:" << mpscore_size;
+
+
     vector<neodraw> neodraw_inframe;
     double infoScore = 0;
-    neoBuildInfoMat(mCurrentFrame, true, infoScore, neodraw_inframe);
+    neoBuildInfoMat(mCurrentFrame, mLastFrame,true, infoScore, neodraw_inframe);
     int match_before_discard = nmatches;
 //    LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
 

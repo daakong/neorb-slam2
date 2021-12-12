@@ -64,7 +64,8 @@ public:
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
     cv::Mat GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp);
-    cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
+    cv::Mat GrabImageRGBD(const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp, const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe);
+        cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
@@ -139,8 +140,11 @@ protected:
 
     void CheckReplacedInLastFrame();
     bool TrackReferenceKeyFrame();
+    bool neoTrackReferenceKeyFrame(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth);
     void UpdateLastFrame();
     bool TrackWithMotionModel();
+    bool neoTrackWithMotionModel(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth);
+
 
     bool Relocalization();
 
@@ -225,13 +229,16 @@ protected:
 
     list<MapPoint*> mlpTemporalPoints;
 
-    void neoTrack();
+    void neoRGBD_Track(bool if_has_exframe, const cv::Mat & exframe_rgb, const cv::Mat & exframe_depth);
+
 
     bool neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model,
                                    double& score, vector<neodraw>& neodraw_vec);
+    bool neoBuildInfoMat(Frame &inFrame, Frame &exFrame, bool call_from_motion_model, double &score,
+                         vector<neodraw> &neodraw_vec);
 
     bool
-    neoComputer_H_subBlock(const cv::Mat &Tcw, const arma::Row<double> &yi, arma::Mat<double> &H13,
+    Computer_H_subBlock(const cv::Mat &Tcw, const arma::Row<double> &yi, arma::Mat<double> &H13,
                          arma::Mat<double> &H47,
                          arma::Mat<double> &dhu_dhrl, const bool check_viz, float &u, float &v);
 
@@ -330,6 +337,12 @@ protected:
     }
 
 
+    bool
+    neoGet_H_subBlock(const cv::Mat &Tcw, const arma::rowvec &yi, arma::mat &H13, arma::mat &H47, arma::mat &dhu_dhrl,
+                      const bool check_viz, float &u, float &v);
+
+    bool neoComputeLastFrameScore(bool if_has_exframe, const cv::Mat &lastimRGB, const cv::Mat &lastimDepth,
+                                  vector<MapPointWithScore> &lastMp_score);
 };
 
 } //namespace ORB_SLAM
