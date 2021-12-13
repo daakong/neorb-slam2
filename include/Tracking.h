@@ -234,7 +234,7 @@ protected:
 
     bool neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model,
                                    double& score, vector<neodraw>& neodraw_vec);
-    bool neoBuildInfoMat(Frame &inFrame, Frame &exFrame, bool call_from_motion_model, double &score,
+    bool neoBuildInfoMat(Frame &inFrame, Frame &exFrame, bool call_from_motion_model, arma::mat & infoMat, vector<MapPointWithScore>& mp_exframe_withScore,
                          vector<neodraw> &neodraw_vec);
 
     bool

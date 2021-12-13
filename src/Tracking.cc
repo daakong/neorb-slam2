@@ -1000,8 +1000,8 @@ namespace ORB_SLAM2 {
     }
 
 
-    bool Tracking::neoBuildInfoMat(Frame &inFrame, Frame &exFrame, bool call_from_motion_model,
-                                   double &score, vector<neodraw> &neodraw_vec) {
+    bool Tracking::neoBuildInfoMat(Frame &inFrame, Frame &exFrame, bool call_from_motion_model, arma::mat & info_mat,
+                                   vector<MapPointWithScore>& mp_exframe_withScore, vector<neodraw> &neodraw_vec) {
 
 //    LOG_S(INFO) << "entering neo info map";
 
@@ -1009,6 +1009,7 @@ namespace ORB_SLAM2 {
         float res_u = 0, res_v = 0, u, v;
 
         vector<arma::mat> pointsInfoMatrices;
+        CHECK_EQ_S(inFrame.mvpMapPoints.size(), mp_exframe_withScore.size())<< "Oh! fuck!";
         for (int i = 0; i < inFrame.mvpMapPoints.size(); i++) {
             MapPoint *pMp = inFrame.mvpMapPoints[i];
 
@@ -1070,9 +1071,10 @@ namespace ORB_SLAM2 {
             }
         }
 //    LOG_S(INFO) << "H_C" << endl << H_c;
-        arma::mat infoMat = H_c.t() * H_c;
-        score = logDet(infoMat);
-        LOG_S(INFO) << "info Mat" << endl << infoMat;
+        arma::mat infoMat_ = H_c.t() * H_c;
+        info_mat = infoMat_;
+        float score = logDet(infoMat_);
+        LOG_S(INFO) << "info Mat" << endl << infoMat_;
 
 //    LOG_S(INFO) << "Score computing finished. Frame" << inFrame.mnId << " Score:" << score ;
 
@@ -1194,7 +1196,7 @@ namespace ORB_SLAM2 {
 
         vector<neodraw> neodraw_inframe;
         double infoScore = 0;
-        neoBuildInfoMat(mCurrentFrame, mLastFrame, false, infoScore, neodraw_inframe);
+        neoBuildInfoMat(mCurrentFrame, false, infoScore, neodraw_inframe);
 //        LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
 
         cv::Mat img_out;
@@ -1276,7 +1278,7 @@ namespace ORB_SLAM2 {
 
         vector<neodraw> neodraw_inframe;
         double infoScore = 0;
-        neoBuildInfoMat(mCurrentFrame, mLastFrame, false, infoScore, neodraw_inframe);
+        neoBuildInfoMat(mCurrentFrame, false, infoScore, neodraw_inframe);
 //        LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
 
         cv::Mat img_out;
@@ -1432,7 +1434,7 @@ namespace ORB_SLAM2 {
 //         cv::imwrite("/home/da/img_grad.png", img_grad);
 //        cv::convertScaleAbs(tmp_img, img_grad); // 转回uint8
         int fsize = lastMp_score.size();
-        for(int i0 = 0; i0 < fsize; i0++ ){
+        for(int i0 = 0; i0 < fsize; i0 ++ ){
             float score = -1;
             MapPoint * pmp_tmp = lastMp_score[i0].GetPMP();
             int u_tmp = (int) lastMp_score[i0].u;
@@ -1442,13 +1444,8 @@ namespace ORB_SLAM2 {
 
             float grad_squ = img_grad.at<uint>(u_tmp, v_tmp);
 
-
+            score = entropy + grad_squ;
             lastMp_score[i0].SetScore(score);
-
-
-            //computer gradient images
-
-
 
         }
         return true;
@@ -1491,11 +1488,12 @@ namespace ORB_SLAM2 {
         LOG_S(INFO) << "mpscore size:" << mpscore_size;
         neoComputeLastFrameScore(if_has_exframe, lastimRGB, lastimDepth, mpwithScore_last);
 
+        LOG_S(INFO) << "mp 10's score:" << mpwithScore_last[10].score;
         vector<neodraw> neodraw_inframe;
-        double infoScore = 0;
-        neoBuildInfoMat(mCurrentFrame, mLastFrame,true, infoScore, neodraw_inframe);
+        arma::mat infoMat;
+        neoBuildInfoMat(mCurrentFrame, mLastFrame,true, infoMat, mpwithScore_last, neodraw_inframe);
         int match_before_discard = nmatches;
-//    LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
+        float infoScore = logDet(infoMat);
 
         cv::Mat img_out;
         cv::Mat img_in;
@@ -1615,7 +1613,7 @@ namespace ORB_SLAM2 {
 
         vector<neodraw> neodraw_inframe;
         double infoScore = 0;
-        neoBuildInfoMat(mCurrentFrame, mLastFrame,true, infoScore, neodraw_inframe);
+        neoBuildInfoMat(mCurrentFrame,true, infoScore, neodraw_inframe);
         int match_before_discard = nmatches;
 //    LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
 
