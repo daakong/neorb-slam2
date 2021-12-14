@@ -24,6 +24,7 @@
 #include"KeyFrame.h"
 #include"Frame.h"
 #include"Map.h"
+#include "armadillo"
 
 #include<opencv2/core/core.hpp>
 #include<mutex>
@@ -152,15 +153,25 @@ class  MapPointWithScore{
 public: MapPointWithScore(MapPoint* pMp, float score_in, float u_in, float v_in);
 
     MapPoint* GetPMP();
-    float GetScore();
-    bool SetScore(float in);
+    bool GetScore_arma(arma::rowvec & score_out);
+    float GetU();
+    float GetV();
+    bool SetScore(float inx, float iny, float inz);
+    bool SetScore_x(float inx);
+    bool SetScore_y(float iny);
+    bool SetScore_z(float inz);
+    bool SetUV(float u_to_set, float v_to_set);
     bool SetPMP(MapPoint *pMp);
 
 public:
-    MapPoint* target_pmpl;
-    float score;
+    MapPoint* target_pMp;
+    float scorex;
+    float scorey;
+    float scorez;
     float u;
     float v;
+    bool has_been_scored;
+    bool has_pmp;
 
 };
 

@@ -1461,9 +1461,11 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, 
                         if(v_last<LastFrame.mnMinY || v_last>LastFrame.mnMaxY)
                             continue;
 
-                        MapPointWithScore mpScore(pMP, -1, u_last, v_last);
-                        MapPoints_LastFrame.push_back(mpScore);
-
+//                        //////Push back会造成数量的不统一，停用pushback，直接使用set赋值。
+//                        MapPointWithScore mpScore(pMP, -1, u_last, v_last);
+//                        MapPoints_LastFrame.push_back(mpScore);
+                         MapPoints_LastFrame[bestIdx2].SetUV(u_last, v_last);
+                         MapPoints_LastFrame[bestIdx2].SetPMP(pMP);
 
 
                         //////ngc part ends

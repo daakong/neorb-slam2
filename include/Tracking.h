@@ -336,6 +336,9 @@ protected:
         }
     }
 
+    bool
+    neoGet_H_subBlock_using_score(const cv::Mat &Tcw, const arma::rowvec &yi, arma::mat &H13, arma::mat &H47, arma::mat &dhu_dhrl,
+                      const bool check_viz, float &u, float &v, float score);
 
     bool
     neoGet_H_subBlock(const cv::Mat &Tcw, const arma::rowvec &yi, arma::mat &H13, arma::mat &H47, arma::mat &dhu_dhrl,

@@ -8,6 +8,7 @@
 #include "armadillo"
 #include<opencv2/core/core.hpp>
 
+#define NEO_FLIP_IMG
 
 namespace  ORB_SLAM2 {
 //

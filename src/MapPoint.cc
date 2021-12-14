@@ -418,22 +418,62 @@ int MapPoint::PredictScale(const float &currentDist, Frame* pF)
 
 
 MapPointWithScore::MapPointWithScore(MapPoint *pMp, float score_in, float u_in, float v_in) {
-    target_pmpl = pMp;
-    score= score_in;
+    target_pMp = pMp;
+    scorex= score_in;
     u = u_in;
     v = v_in;
+    has_been_scored = false;
+    has_pmp = false;
 }
 
 MapPoint *MapPointWithScore::GetPMP() {
-        return  target_pmpl;
+        return  target_pMp;
+}
+float  MapPointWithScore::GetU(){
+        return  u;
+}
+float  MapPointWithScore::GetV(){
+        return  v;
+}
+bool MapPointWithScore::GetScore_arma(arma::rowvec & score_out) {
+    score_out[0] = scorex;
+    score_out[1] = scorey;
+    score_out[2] = scorez;
+
+    return true;
 }
 
-bool MapPointWithScore::SetScore(float in) {
-    score = in;
+bool MapPointWithScore::SetScore_x(float inx) {
+    scorex = inx;
+    return true;
+}
+bool MapPointWithScore::SetScore_y(float iny) {
+    scorey = iny;
+    return true;
+}
+bool MapPointWithScore::SetScore_z(float inz) {
+    scorez = inz;
+    return true;
+}
+
+
+bool MapPointWithScore::SetScore(float inx, float iny, float inz) {
+    scorex = inx;
+    scorey = iny;
+    scorez = inz;
+    has_been_scored = true;
+    return true;
+}
+
+bool MapPointWithScore::SetUV(float u_to_set, float v_to_set) {
+    u_to_set = u;
+    v_to_set = v;
+    return true;
 }
 
 bool MapPointWithScore::SetPMP(MapPoint *pMp) {
-         target_pmpl = pMp;
+         target_pMp = pMp;
+         has_pmp = true;
         return  true;
 }
 
