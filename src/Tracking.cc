@@ -1041,11 +1041,14 @@ namespace ORB_SLAM2 {
                     drawPoint.position = measurePosi;
 
                     arma::rowvec score_3d_lastp = arma::zeros<arma::rowvec>(3);
-                    float score_from_local_illum =  mp_exframe_withScore[i].GetScore_arma(score_3d_lastp);
+//                    float score_from_local_illum =  mp_exframe_withScore[i].GetScore_arma(score_3d_lastp);
+                    mp_exframe_withScore[i].GetScore_arma(score_3d_lastp);
+
+//                    LOG_S(INFO) << "SCORE 3D:" << score_3d_lastp[0] << "," <<score_3d_lastp[1];
 
                     // insert h subblock compute
                     bool flag = Tracking::neoGet_H_subBlock_using_score(inFrame.mTcw, featurePosi.subvec(0, 2), H13, H47, H_proj,
-                                                       true, u, v, score_from_local_illum);
+                                                                        true, u, v, score_3d_lastp);
                     res_u = measurePosi[0] - u;
                     res_v = measurePosi[1] - v;
 
@@ -1091,14 +1094,24 @@ namespace ORB_SLAM2 {
     }
 
     inline bool Tracking::neoGet_H_subBlock_using_score(const cv::Mat &Tcw,
-                                            const arma::rowvec &yi,
-                                            arma::mat &H13, arma::mat &H47,
-                                            arma::mat &dhu_dhrl,
-                                            const bool check_viz,
-                                            float &u, float &v, float score) {
+                                                        const arma::rowvec &yi,
+                                                        arma::mat &H13, arma::mat &H47,
+                                                        arma::mat &dhu_dhrl,
+                                                        const bool check_viz,
+                                                        float &u, float &v, const arma::rowvec & score) {
 
         cv::Mat idMat = cv::Mat::eye(4, 4, CV_32F);
         arma::rowvec Xv;
+
+        arma::rowvec score_projected = arma::zeros<arma::rowvec>(4);
+        score_projected.subvec(0,2) = score.subvec(0,2);
+        score_projected[3] = 1.f;
+        cv::Mat score_proj(4,1, CV_32F);
+        score_proj.at<float>(0,0) = score[0];
+        score_proj.at<float>(1,0) = score[1];
+        score_proj.at<float>(2,0) = score[2];
+        score_proj.at<float>(3,0) = 1.f;
+        score_proj = Tcw * score_proj;
 
         convert_Homo_Pair_To_PWLS_Vec(0, idMat, 1, Tcw, Xv);
         arma::rowvec q_wr = Xv.subvec(3, 6);
@@ -1489,23 +1502,23 @@ namespace ORB_SLAM2 {
         int fsize = lastMp_score.size();
         for(int i0 = 0; i0 < fsize; i0 ++ ) {
             if(lastMp_score[i0].target_pMp){
-            float score = -1;
-            MapPoint *pmp_tmp = lastMp_score[i0].GetPMP();
-            int u_tmp = (int) lastMp_score[i0].u;
-            int v_tmp = (int) lastMp_score[i0].v;
+                float score = -1;
+                MapPoint *pmp_tmp = lastMp_score[i0].GetPMP();
+                int u_tmp = (int) lastMp_score[i0].u;
+                int v_tmp = (int) lastMp_score[i0].v;
 
-            float entropy = localEntropy4uv(img_gray, u_tmp, v_tmp);
+                float entropy = localEntropy4uv(img_gray, u_tmp, v_tmp);
 
-            float grad_squ = img_grad.at<uint>(u_tmp, v_tmp);
+                float grad_squ = img_grad.at<uint>(u_tmp, v_tmp);
 
-            score = entropy + grad_squ;
+                score = entropy + grad_squ;
 //            lastMp_score[i0].SetScore_x(score);
 //            lastMp_score[i0].SetScore_y(score);
 //            lastMp_score[i0].SetScore_z(0.005f);
-            lastMp_score[i0].SetScore(score, score, 0.005f);
+                lastMp_score[i0].SetScore(score, score, 0.005f);
 
 
-        }
+            }
 
         }
 
