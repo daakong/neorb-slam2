@@ -154,6 +154,14 @@ public: MapPointWithScore(MapPoint* pMp, float score_in, float u_in, float v_in)
 
     MapPoint* GetPMP();
     bool GetScore_arma(arma::rowvec & score_out);
+
+    // Mat target should have 3 rows and 1 col, cv::32F(float)类型！！！ VERY IMPORTANT！！
+    bool GetScore_cvmat(cv::Mat & mat_target);
+
+    // Mat target should have 4 rows and 1 col, cv::32F(float)类型！！！ VERY IMPORTANT！！最后一个值会固定设为1.f
+    bool GetScore_cvmat_homo(cv::Mat & mat_target);
+
+
     float GetU();
     float GetV();
     bool SetScore(float inx, float iny, float inz);

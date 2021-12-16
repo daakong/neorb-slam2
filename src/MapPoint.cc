@@ -443,6 +443,26 @@ bool MapPointWithScore::GetScore_arma(arma::rowvec & score_out) {
     return true;
 }
 
+bool MapPointWithScore::GetScore_cvmat(cv::Mat &mat_target) {
+
+    mat_target.at<float>(0,0) = scorex;
+    mat_target.at<float>(1,0) = scorey;
+    mat_target.at<float>(2,0) = scorez;
+
+    return true;
+}
+
+    bool MapPointWithScore::GetScore_cvmat_homo(cv::Mat &mat_target) {
+
+        mat_target.at<float>(0,0) = scorex;
+        mat_target.at<float>(1,0) = scorey;
+        mat_target.at<float>(2,0) = scorez;
+        mat_target.at<float>(3,0) = 1.0f;
+
+        return true;
+    }
+
+
 bool MapPointWithScore::SetScore_x(float inx) {
     scorex = inx;
     return true;

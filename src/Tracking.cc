@@ -1005,7 +1005,7 @@ namespace ORB_SLAM2 {
 
 //    LOG_S(INFO) << "entering neo info map";
 
-        arma::mat H13, H47, H_meas, H_proj, H_disp, H_rw;
+        arma::mat  H_meas, H_proj, H_disp, H_rw;
         float res_u = 0, res_v = 0, u, v;
 
         vector<arma::mat> pointsInfoMatrices;
@@ -1040,20 +1040,24 @@ namespace ORB_SLAM2 {
                     measurePosi[1] = kpUn.pt.y;
                     drawPoint.position = measurePosi;
 
-                    arma::rowvec score_3d_lastp = arma::zeros<arma::rowvec>(3);
-//                    float score_from_local_illum =  mp_exframe_withScore[i].GetScore_arma(score_3d_lastp);
-                    mp_exframe_withScore[i].GetScore_arma(score_3d_lastp);
+                    // arma 模式的向量，有点浪费事情，转为cv：：Mat类型
+//                    arma::rowvec score_3d_lastp = arma::zeros<arma::rowvec>(3);
+////                    float score_from_local_illum =  mp_exframe_withScore[i].GetScore_arma(score_3d_lastp);
+//                    mp_exframe_withScore[i].GetScore_arma(score_3d_lastp);
 
+                    // CVMAT 类型的score值
+                    cv::Mat score_3d_homo(4,1,CV_32F);
+                    mp_exframe_withScore[i].GetScore_cvmat_homo(score_3d_homo);
 //                    LOG_S(INFO) << "SCORE 3D:" << score_3d_lastp[0] << "," <<score_3d_lastp[1];
 
                     // insert h subblock compute
-                    bool flag = Tracking::neoGet_H_subBlock_using_score(inFrame.mTcw, featurePosi.subvec(0, 2), H13, H47, H_proj,
-                                                                        true, u, v, score_3d_lastp);
+                    bool flag = Tracking::neoGet_H_subBlock_using_score(inFrame.mTcw, featurePosi.subvec(0, 2), H_meas, H_proj,
+                                                                        true, u, v, score_3d_homo);
                     res_u = measurePosi[0] - u;
                     res_v = measurePosi[1] - v;
 
-                    // assemble into H matrix
-                    H_meas = arma::join_horiz(H13, H47);
+//                    // assemble into H matrix
+//                    H_meas = arma::join_horiz(H13, H47);
 
 
                     if (flag) {
@@ -1062,7 +1066,12 @@ namespace ORB_SLAM2 {
                         LOG_S(WARNING) << "H computing: something wrong.....frame" << inFrame.mnId;
                     }
 
-                    reWeightInfoMat(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw);
+                    arma::rowvec sigma_uv, sigma_p;
+
+                    computerSigma(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw, sigma_uv, sigma_p, score_3d_homo);
+
+                    synthInfoMat(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw, sigma_uv, sigma_p);
+//                    reWeightInfoMat(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw);
 //                LOG_S(INFO) << "H_measure:" << endl << H_meas << endl << "H_rw:" << endl << H_rw;
                     arma::mat point_infoMat = H_rw.t() * H_rw;
                     double single_point_score = logDet(point_infoMat);
@@ -1072,7 +1081,7 @@ namespace ORB_SLAM2 {
                 }
             }
         }
-        LOG_S(INFO) << "important!! matched" << matched_id << ", size:" << mp_exframe_withScore.size();
+//        LOG_S(INFO) << "important!! matched" << matched_id << ", size:" << mp_exframe_withScore.size();
         arma::mat H_c;
         for (vector<arma::mat>::iterator iter = pointsInfoMatrices.begin(); iter != pointsInfoMatrices.end(); iter++) {
             if (iter == pointsInfoMatrices.begin()) {
@@ -1095,11 +1104,96 @@ namespace ORB_SLAM2 {
 
     inline bool Tracking::neoGet_H_subBlock_using_score(const cv::Mat &Tcw,
                                                         const arma::rowvec &yi,
+                                                        arma::mat &H_out,
+                                                        arma::mat &dh_dp,
+                                                        const bool check_viz,
+                                                        float &u, float &v, const cv::Mat & score) {
+
+        cv::Mat idMat = cv::Mat::eye(4, 4, CV_32F);
+        arma::rowvec Xv;
+
+//        cv::Mat score_proj(4,1, CV_32F);
+//        score_proj = Tcw * score;
+
+        convert_Homo_Pair_To_PWLS_Vec(0, idMat, 1, Tcw, Xv);
+        arma::rowvec q_wr = Xv.subvec(3, 6);
+        arma::mat R_rw = arma::inv(q2r(q_wr));
+        arma::rowvec t_rw = yi - Xv.subvec(0, 2);
+
+        float fu = mCurrentFrame.fx;
+        float fv = mCurrentFrame.fy;
+
+        // dhu_dhrl
+        // lmk @ camera coordinate
+        arma::mat hrl = R_rw * t_rw.t();
+
+        cv::Mat Twc(4,1,CV_32F);
+        cv::invert(Tcw, Twc);
+        cv::Mat homo_p(4,1,CV_32F);
+        homo_p.at<float>(0,0) = yi(0,0);
+        homo_p.at<float>(1,0) = yi(0,1);
+        homo_p.at<float>(2,0) = yi(0,2);
+        homo_p.at<float>(3,0) = 1.0f;
+        homo_p = Tcw * homo_p;
+
+
+        float px = homo_p.at<float>(0,0);
+        float py = homo_p.at<float>(1,0);
+        float pz = homo_p.at<float>(2,0);
+        arma::mat dh_dp_ = arma::zeros<arma::mat>(2,3);
+        if(homo_p.at<float>(2,0) < 1e-6){
+            // 如果深度太小，则输出0
+            //todo
+        } else{
+          dh_dp_ = {
+                  {fu / homo_p.at<float>(2,0), 0.0f, -homo_p.at<float>(0,0) * fu / (homo_p.at<float>(2,0) * homo_p.at<float>(2,0))},
+                  {0.0f, fv/homo_p.at<float>(2,0),  -homo_p.at<float>(1,0) * fu / (homo_p.at<float>(2,0) * homo_p.at<float>(2,0))}
+          };
+        }
+
+//        if (fabs(hrl(2, 0)) < 1e-6) {
+//            dhu_dhrl = arma::zeros<arma::mat>(2, 3);
+//        } else {
+//            //        dhu_dhrl << fu/(hrl(2,0))   <<   0.0  <<   -hrl(0,0)*fu/( std::pow(hrl(2,0), 2.0)) << arma::endr
+//            //                 << 0.0    <<  fv/(hrl(2,0))   <<  -hrl(1,0)*fv/( std::pow(hrl(2,0), 2.0)) << arma::endr;
+//            dhu_dhrl = {{fu / (hrl(2, 0)), 0.0,              -hrl(0, 0) * fu / (std::pow(hrl(2, 0), 2.0))},
+//                        {0.0,              fv / (hrl(2, 0)), -hrl(1, 0) * fv / (std::pow(hrl(2, 0), 2.0))}};
+//        }
+
+        arma::mat  dp_dxi_ = arma::zeros<arma::mat>(3,6);
+        dp_dxi_ = {
+                {1.f, 0.f, 0.f, 0.f,pz , -py },
+                {0.f, 1.f, 0.f, -pz, 0.f, px },
+                {0.f, 0.f, 1.f, py, -px, 0.f}
+        };
+
+//        arma::rowvec qwr_conj = qconj(q_wr);
+//        // H matrix subblock (cols 1~3): H13
+//        H13 = -1.0 * (dhu_dhrl * R_rw);
+//
+//        arma::colvec v2;
+//        v2 << 1.0 << -1.0 << -1.0 << -1.0 << arma::endr;
+//        arma::mat dqbar_by_dq = arma::diagmat(v2);
+//
+//        // H matrix subblock (cols 4~7): H47
+//        H47 = dhu_dhrl * (dRq_times_a_by_dq(qwr_conj, t_rw) * dqbar_by_dq);
+
+        dh_dp =dh_dp_;
+
+        H_out = dh_dp_ * dp_dxi_;
+        return true;
+
+    }
+
+
+    inline bool Tracking::neoGet_H_subBlock_using_score(const cv::Mat &Tcw,
+                                                        const arma::rowvec &yi,
                                                         arma::mat &H13, arma::mat &H47,
                                                         arma::mat &dhu_dhrl,
                                                         const bool check_viz,
                                                         float &u, float &v, const arma::rowvec & score) {
 
+        // 这是使用arma格式传递分数值的版本，暂时废弃。。。
         cv::Mat idMat = cv::Mat::eye(4, 4, CV_32F);
         arma::rowvec Xv;
 
@@ -1474,7 +1568,10 @@ namespace ORB_SLAM2 {
         }
     }
 
-    bool Tracking::neoComputeLastFrameScore(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth, vector<MapPointWithScore> & lastMp_score)
+    bool Tracking::neoComputeLastFrameScore(bool if_has_exframe, const cv::Mat & lastimRGB,
+                                            const cv::Mat & lastimDepth,
+                                            vector<MapPointWithScore> & lastMp_score,
+                                            const cv::Mat & Tcw_exframe)
     {
         //// This is for RGB-D...
         //// Stereo mode may need modification.
@@ -1515,7 +1612,16 @@ namespace ORB_SLAM2 {
 //            lastMp_score[i0].SetScore_x(score);
 //            lastMp_score[i0].SetScore_y(score);
 //            lastMp_score[i0].SetScore_z(0.005f);
-                lastMp_score[i0].SetScore(score, score, 0.005f);
+                cv::Mat score_vec(4,1,CV_32F);
+                score_vec.at<float>(0,0) = score;
+                score_vec.at<float>(1,0) = score;
+                score_vec.at<float>(2,0) = 0.05f;
+                score_vec.at<float>(3,0) = 1.f;
+                cv::Mat Twc;
+                cv::invert(Tcw_exframe, Twc, cv::DECOMP_CHOLESKY);
+//                LOG_S(INFO) << "TWC" << Twc;
+                score_vec = Twc * score_vec;
+                lastMp_score[i0].SetScore(score_vec.at<float>(0,0), score_vec.at<float>(1,0), score_vec.at<float>(2,0));
 
 
             }
@@ -1562,7 +1668,7 @@ namespace ORB_SLAM2 {
 
         int mpscore_size = mpwithScore_last.size();
 //        LOG_S(INFO) << "mpscore size:" << mpscore_size;
-        neoComputeLastFrameScore(if_has_exframe, lastimRGB, lastimDepth, mpwithScore_last);
+        neoComputeLastFrameScore(if_has_exframe, lastimRGB, lastimDepth, mpwithScore_last, mLastFrame.mTcw);
 
 //        LOG_S(INFO) << "mp 10's score:" << mpwithScore_last[10].score;
         vector<neodraw> neodraw_inframe;
@@ -2434,7 +2540,145 @@ namespace ORB_SLAM2 {
     }
 
 
+    inline void Tracking::synthInfoMat(const Frame *F, const int &kptIdx, const MapPoint *pMP,
+                             const arma::mat &H_meas, const float &res_u, const float &res_v,
+                             const arma::mat &H_proj, arma::mat &H_rw,
+                             const arma::rowvec & sig_uv, const arma::rowvec & sig_p)
+    {
 
+        int measSz = H_meas.n_rows;
+        arma::mat Sigma_r(measSz, measSz), W_r(measSz, measSz);
+        Sigma_r.eye();
+        Sigma_r = Sigma_r * sig_uv(0,0);
+
+        arma::mat  Sigma_p ={
+                {sig_p(0,0) , 0.f, 0.f},
+                {0.f,sig_p(0,1) , 0.f },
+                {0.f, 0.f, sig_p(0,2) }
+        };
+        Sigma_p = Sigma_p * H_proj.t();
+        Sigma_p = H_proj * Sigma_p;
+
+        Sigma_r = Sigma_p + Sigma_r;
+
+        if(arma::chol(W_r, Sigma_r, "lower") == 1){
+            H_rw = arma::inv(W_r) * H_meas;
+        }
+        else{
+            // do nothing
+            std::cout << "chol failed!" << std::endl;
+//                                std::cout << "oct level =" << kpUn.octave << "; invSigma2 = " << invSigma2 << std::endl;
+        }
+
+//        if (F != NULL && kptIdx >= 0 && kptIdx < F->mvKeysUn.size())
+//        {
+//            //
+//            float Sigma2 = F->mvLevelSigma2[F->mvKeysUn[kptIdx].octave];
+//            Sigma_r = Sigma_r * Sigma2;
+//
+////            std::cout << Sigma_r ;
+////            std::cout << "sigma2:" << Sigma2 << std::endl;
+//
+//
+//        }
+
+//        // cholesky decomp of diagonal-block scaling matrix W
+//        if (arma::chol(W_r, Sigma_r, "lower") == true)
+//        {
+//            // scale the meas. Jacobian with the scaling block W_r
+//            H_rw = arma::inv(W_r) * H_meas;
+////            std::cout << H_rw;
+//        }
+//        else{
+//            // do nothing
+//            std::cout << "chol failed!" << std::endl;
+////                                std::cout << "oct level =" << kpUn.octave << "; invSigma2 = " << invSigma2 << std::endl;
+//        }
+//
+        //#ifdef WITH_QUALITY_WEIGHTED_JACOBIAN
+        //        double quality_max = double(ORBmatcher::TH_HIGH);
+        //#ifdef OBS_DEBUG_VERBOSE
+        //        std::cout << F->mvpMatchScore[i] << std::endl;
+        //        std::cout << H << std::endl;
+        //#endif
+        //        double weight_qual = std::max(0.0, double(quality_max - F->mvpMatchScore[i]) / double(quality_max));
+        //        weight_qual = weight_qual * (1.0 - BASE_WEIGHT_QUAL) + BASE_WEIGHT_QUAL;
+        //        H = H * weight_qual;
+        //#ifdef OBS_DEBUG_VERBOSE
+        //        std::cout << weight_qual << std::endl;
+        //        std::cout << H << std::endl << std::endl << std::endl;
+        //#endif
+        //#endif
+
+    }
+
+
+    inline void Tracking::computerSigma(const Frame *F, const int &kptIdx, const MapPoint *pMP,
+                                       const arma::mat &H_meas, const float &res_u, const float &res_v,
+                                       const arma::mat &H_proj, arma::mat &H_rw,
+                                       arma::rowvec & sig_uv, arma::rowvec & sig_p,
+                                       const cv::Mat & score_3d_homo)
+    {
+
+        sig_uv = {1.f, 1.f};
+        if (F != NULL && kptIdx >= 0 && kptIdx < F->mvKeysUn.size())
+        {
+            float level_factor = F->mvLevelSigma2[F->mvKeysUn[kptIdx].octave];
+            sig_uv = sig_uv * level_factor;
+        }
+
+        sig_p = {1.f, 1.f, 1.f};
+
+        cv::Mat score_proj(4,1, CV_32F);
+        score_proj = F->mTcw * score_3d_homo;
+
+        sig_p = {score_proj.at<float>(0,0), score_proj.at<float>(1,0), score_proj.at<float>(2,0)};
+
+//        int measSz = H_meas.n_rows;
+//        arma::mat Sigma_r(measSz, measSz), W_r(measSz, measSz);
+//        Sigma_r.eye();
+//
+//        if (F != NULL && kptIdx >= 0 && kptIdx < F->mvKeysUn.size())
+//        {
+//            //
+//            float Sigma2 = F->mvLevelSigma2[F->mvKeysUn[kptIdx].octave];
+//            Sigma_r = Sigma_r * Sigma2;
+//
+////            std::cout << Sigma_r ;
+////            std::cout << "sigma2:" << Sigma2 << std::endl;
+//
+//
+//        }
+//
+//        // cholesky decomp of diagonal-block scaling matrix W
+//        if (arma::chol(W_r, Sigma_r, "lower") == true)
+//        {
+//            // scale the meas. Jacobian with the scaling block W_r
+//            H_rw = arma::inv(W_r) * H_meas;
+////            std::cout << H_rw;
+//        }
+//        else{
+//            // do nothing
+//            std::cout << "chol failed!" << std::endl;
+////                                std::cout << "oct level =" << kpUn.octave << "; invSigma2 = " << invSigma2 << std::endl;
+//        }
+
+        //#ifdef WITH_QUALITY_WEIGHTED_JACOBIAN
+        //        double quality_max = double(ORBmatcher::TH_HIGH);
+        //#ifdef OBS_DEBUG_VERBOSE
+        //        std::cout << F->mvpMatchScore[i] << std::endl;
+        //        std::cout << H << std::endl;
+        //#endif
+        //        double weight_qual = std::max(0.0, double(quality_max - F->mvpMatchScore[i]) / double(quality_max));
+        //        weight_qual = weight_qual * (1.0 - BASE_WEIGHT_QUAL) + BASE_WEIGHT_QUAL;
+        //        H = H * weight_qual;
+        //#ifdef OBS_DEBUG_VERBOSE
+        //        std::cout << weight_qual << std::endl;
+        //        std::cout << H << std::endl << std::endl << std::endl;
+        //#endif
+        //#endif
+
+    }
 
 
 } //namespace ORB_SLAM

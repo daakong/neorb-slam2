@@ -158,6 +158,19 @@ protected:
     bool NeedNewKeyFrame();
     void CreateNewKeyFrame();
 
+    ///////neo function
+    // sig_uv 应当是一个2元素rowvec。 sig_p 应当是一个三元素rowvec。
+
+    inline void synthInfoMat(const Frame *F, const int &kptIdx, const MapPoint *pMP,
+                             const arma::mat &H_meas, const float &res_u, const float &res_v,
+                             const arma::mat &H_proj, arma::mat &H_rw,
+                             const arma::rowvec & sig_uv, const arma::rowvec & sig_p);
+
+    // sig_uv 应当是一个2元素rowvec。 sig_p 应当是一个三元素rowvec。
+    inline void computerSigma(const Frame *F, const int &kptIdx, const MapPoint *pMP,
+                                        const arma::mat &H_meas, const float &res_u, const float &res_v,
+                                        const arma::mat &H_proj, arma::mat &H_rw,
+                                        arma::rowvec & sig_uv, arma::rowvec & sig_p, const cv::Mat & score_3d_homo);
     // In case of performing only localization, this flag is true when there are no matches to
     // points in the map. Still tracking will continue if there are enough matches with temporal points.
     // In that case we are doing visual odometry. The system will try to do relocalization to recover
@@ -337,15 +350,21 @@ protected:
     }
 
     bool
+    neoGet_H_subBlock_using_score(const cv::Mat &Tcw, const arma::rowvec &yi, arma::mat &H_out, arma::mat &dh_dp,
+                      const bool check_viz, float &u, float &v, const cv::Mat & score);
+    bool
     neoGet_H_subBlock_using_score(const cv::Mat &Tcw, const arma::rowvec &yi, arma::mat &H13, arma::mat &H47, arma::mat &dhu_dhrl,
-                      const bool check_viz, float &u, float &v, const arma::rowvec &　score);
+                      const bool check_viz, float &u, float &v, const arma::rowvec & score);
+
+
+
 
     bool
     neoGet_H_subBlock(const cv::Mat &Tcw, const arma::rowvec &yi, arma::mat &H13, arma::mat &H47, arma::mat &dhu_dhrl,
                       const bool check_viz, float &u, float &v);
 
     bool neoComputeLastFrameScore(bool if_has_exframe, const cv::Mat &lastimRGB, const cv::Mat &lastimDepth,
-                                  vector<MapPointWithScore> &lastMp_score);
+                                  vector<MapPointWithScore> &lastMp_score, const cv::Mat & Tcw_exframe);
 };
 
 } //namespace ORB_SLAM
