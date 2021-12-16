@@ -1594,7 +1594,7 @@ namespace ORB_SLAM2 {
         );
         cv::convertScaleAbs(tmp_imgy, tmp_imgy);
         cv::addWeighted(tmp_imgx, 0.5, tmp_imgy, 0.5, 0, img_grad);
-//         cv::imwrite("/home/da/img_grad.png", img_grad);
+         cv::imwrite("/home/da/img_grad.png", img_grad);
 //        cv::convertScaleAbs(tmp_img, img_grad); // 转回uint8
         int fsize = lastMp_score.size();
         for(int i0 = 0; i0 < fsize; i0 ++ ) {
@@ -1608,13 +1608,15 @@ namespace ORB_SLAM2 {
 
                 float grad_squ = img_grad.at<uint>(u_tmp, v_tmp);
 
-                score = entropy + grad_squ;
+                score = ( entropy * grad_squ )/ 40.f;
+                LOG_S(INFO) << "SCORE: " << score;
+//                score = entropy / 20.f + grad_squ / 40.f;
 //            lastMp_score[i0].SetScore_x(score);
 //            lastMp_score[i0].SetScore_y(score);
 //            lastMp_score[i0].SetScore_z(0.005f);
                 cv::Mat score_vec(4,1,CV_32F);
-                score_vec.at<float>(0,0) = score;
-                score_vec.at<float>(1,0) = score;
+                score_vec.at<float>(0,0) = score + 1.f;
+                score_vec.at<float>(1,0) = score + 1.f;
                 score_vec.at<float>(2,0) = 0.05f;
                 score_vec.at<float>(3,0) = 1.f;
                 cv::Mat Twc;

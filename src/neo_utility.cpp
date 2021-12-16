@@ -84,7 +84,7 @@ namespace  ORB_SLAM2 {
                 cout << Hist.at<float>(0, i) << " ";
             }
         }*/
-        float out_entropy;
+        float out_entropy = 0.f;
 
         //cout << double(imgn.at<float>(i,j)) << endl;
         //cout << "什么数值：" << Hist.at<float>(20) << " ";
