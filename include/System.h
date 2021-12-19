@@ -74,8 +74,8 @@ public:
 
     //this is neorb neo track.!!
 
-    cv::Mat neoTrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp, const cv::Mat &im_last,
-                         const cv::Mat &depth_last);
+    cv::Mat neoTrackRGBD(const int ni, const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp, const cv::Mat &im_last,
+                         const cv::Mat &depth_last, cv::Mat & last_key_imGray);
     cv::Mat neoTrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
 
 

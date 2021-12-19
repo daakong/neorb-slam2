@@ -88,6 +88,7 @@ int main(int argc, char **argv)
     // Main loop
     cv::Mat imRGB, imD;
     cv::Mat exframe_imRGB, exframe_imD;
+    cv::Mat ex_keyframe_imGray, ex_keyframe_imD;
     for(int ni=0; ni<nImages; ni++)
     {
         // Read image and depthmap from file
@@ -113,12 +114,12 @@ int main(int argc, char **argv)
         }
         // Pass the image to the SLAM system
         SLAM.TrackRGBD(imRGB,imD,tframe);
-        if(ni == 0) {
-            SLAM.neoTrackRGBD(imRGB, imD, tframe);
-        }
-        else{
-            SLAM.neoTrackRGBD(imRGB, imD, tframe, exframe_imRGB, exframe_imD);
-        }
+//        if(ni == 0) {
+//            SLAM.neoTrackRGBD(imRGB, imD, tframe);
+//        }
+//        else{
+            SLAM.neoTrackRGBD(ni, imRGB, imD, tframe, exframe_imRGB, exframe_imD, ex_keyframe_imGray);
+//        }
         imD.copyTo(exframe_imD);
         imRGB.copyTo(exframe_imRGB);
 

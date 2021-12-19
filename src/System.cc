@@ -227,8 +227,8 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     return Tcw;
 }
 
-cv::Mat System::neoTrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp,
-                             const cv::Mat &im_last, const cv::Mat &depth_last)
+cv::Mat System::neoTrackRGBD(const int ni, const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp,
+                             const cv::Mat &im_last, const cv::Mat &depth_last, cv::Mat & last_key_imGray)
     {
         if(mSensor!=RGBD)
         {
@@ -270,7 +270,7 @@ cv::Mat System::neoTrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const d
             }
         }
 
-        cv::Mat Tcw = mpTracker->GrabImageRGBD(im,depthmap,timestamp, im_last, depth_last);
+        cv::Mat Tcw = mpTracker->GrabImageRGBD(ni, im,depthmap,timestamp, im_last, depth_last, last_key_imGray);
 
         unique_lock<mutex> lock2(mMutexState);
         mTrackingState = mpTracker->mState;

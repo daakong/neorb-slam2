@@ -221,12 +221,16 @@ namespace ORB_SLAM2 {
                               mThDepth);
 
 //    Track();
-        neoRGBD_Track(false, imRGB, imDepth);
+//        neoRGBD_Track(false, imRGB, imDepth, imRGB);
+
+        LOG_S(ERROR) << "rUNING WRONG CODE!!!";
         return mCurrentFrame.mTcw.clone();
     }
 
-    cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp,
-                                    const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe) {
+    cv::Mat Tracking::GrabImageRGBD( const int frame_n, const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp,
+                                    const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe,
+                                    cv::Mat &imgray_LastKeyframe
+                                    ) {
         mImGray = imRGB;
         cv::Mat imDepth = imD;
 
@@ -249,7 +253,13 @@ namespace ORB_SLAM2 {
                               mThDepth);
 
 //    Track();
-        neoRGBD_Track(true, imLastframe, imDepthLastframe);
+
+        if(frame_n == 0){
+            neoRGBD_Track(false, imLastframe, imDepthLastframe, imgray_LastKeyframe);
+        } else{
+            neoRGBD_Track(true, imLastframe, imDepthLastframe, imgray_LastKeyframe);
+        }
+
         return mCurrentFrame.mTcw.clone();
     }
 
@@ -279,7 +289,8 @@ namespace ORB_SLAM2 {
         return mCurrentFrame.mTcw.clone();
     }
 
-    void Tracking::neoRGBD_Track(bool if_has_exframe, const cv::Mat &exframe_rgb, const cv::Mat & exframe_depth) {
+    void Tracking::neoRGBD_Track(bool if_has_exframe, const cv::Mat &exframe_rgb, const cv::Mat & exframe_depth,
+                                 cv::Mat & ex_keyframe_gray) {
         if (mState == NO_IMAGES_YET) {
             mState = NOT_INITIALIZED;
         }
@@ -320,14 +331,14 @@ namespace ORB_SLAM2 {
                     if (mVelocity.empty() || mCurrentFrame.mnId < mnLastRelocFrameId + 2) {
 //                        LOG_S(INFO) << "To track reference frame here." << mCurrentFrame.mnId;
 //                        bOK = TrackReferenceKeyFrame();
-                        bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth);
+                        bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth, ex_keyframe_gray);
                     } else {
 //                        LOG_S(INFO) << "To track motion model here." << mCurrentFrame.mnId;
 //                        bOK = TrackWithMotionModel();
                         bOK = neoTrackWithMotionModel(if_has_exframe, exframe_rgb, exframe_depth);
                         if (!bOK){
 //                            bOK = TrackReferenceKeyFrame();
-                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth);
+                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth, ex_keyframe_gray);
                         }
                     }
                 } else {
@@ -348,7 +359,7 @@ namespace ORB_SLAM2 {
                             bOK = neoTrackWithMotionModel(if_has_exframe, exframe_rgb, exframe_depth);
                         } else {
 //                            LOG_S(INFO) << "To track key frame.";
-                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth);
+                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth,ex_keyframe_gray);
 //                            bOK = TrackReferenceKeyFrame();
                         }
 
@@ -448,9 +459,10 @@ namespace ORB_SLAM2 {
                 mlpTemporalPoints.clear();
 
                 // Check if we need to insert a new keyframe
-                if (NeedNewKeyFrame())
+                if (NeedNewKeyFrame()) {
                     CreateNewKeyFrame();
-
+                    mImGray.copyTo(ex_keyframe_gray);
+                }
                 // We allow points with high innovation (considererd outliers by the Huber Function)
                 // pass to the new keyframe, so that bundle adjustment will finally decide
                 // if they are outliers or not. We don't want next frame to estimate its position
@@ -1009,6 +1021,8 @@ namespace ORB_SLAM2 {
         float res_u = 0, res_v = 0, u, v;
 
         vector<arma::mat> pointsInfoMatrices;
+        vector<arma::mat> h_wr_row_vec;
+        arma::mat infoMat_ = arma::zeros<arma::mat>(6,6);
         int matched_id = 0;
 
         for (int i = 0; i < inFrame.mvpMapPoints.size(); i++) {
@@ -1074,24 +1088,32 @@ namespace ORB_SLAM2 {
 //                    reWeightInfoMat(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw);
 //                LOG_S(INFO) << "H_measure:" << endl << H_meas << endl << "H_rw:" << endl << H_rw;
                     arma::mat point_infoMat = H_rw.t() * H_rw;
-                    double single_point_score = logDet(point_infoMat);
+                    if(infoMat_.size()==point_infoMat.size()){
+                        infoMat_ = infoMat_ + point_infoMat;
+                    } else{
+                        // doing nothing
+                    }
+                    float single_point_score = logDet(point_infoMat);
                     drawPoint.score = single_point_score;
                     pointsInfoMatrices.push_back(point_infoMat);
+                    h_wr_row_vec.push_back(H_rw);
                     neodraw_vec.push_back(drawPoint);
                 }
             }
         }
 //        LOG_S(INFO) << "important!! matched" << matched_id << ", size:" << mp_exframe_withScore.size();
-        arma::mat H_c;
-        for (vector<arma::mat>::iterator iter = pointsInfoMatrices.begin(); iter != pointsInfoMatrices.end(); iter++) {
-            if (iter == pointsInfoMatrices.begin()) {
-                H_c = *iter;
-            } else {
-                H_c = arma::join_vert(H_c, *iter);
-            }
-        }
+
+//        arma::mat H_c;
+//        for (vector<arma::mat>::iterator iter = h_wr_row_vec.begin(); iter != h_wr_row_vec.end(); iter++) {
+//            if (iter == h_wr_row_vec.begin()) {
+//                H_c = *iter;
+//            } else {
+//                H_c = arma::join_vert(H_c, *iter);
+//            }
+//        }
 //    LOG_S(INFO) << "H_C" << endl << H_c;
-        arma::mat infoMat_ = H_c.t() * H_c;
+//        infoMat_ = H_c.t() * H_c;
+
         info_mat = infoMat_;
         float score = logDet(infoMat_);
         LOG_S(INFO) << "info Mat" << endl << infoMat_;
@@ -1337,7 +1359,8 @@ namespace ORB_SLAM2 {
 
     }
 
-    bool Tracking::neoTrackReferenceKeyFrame(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth) {
+    bool Tracking::neoTrackReferenceKeyFrame(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth,
+                                             const cv::Mat & imgray_keyframe) {
         // Compute Bag of Words vector
         mCurrentFrame.ComputeBoW();
 
@@ -1345,8 +1368,10 @@ namespace ORB_SLAM2 {
         // If enough matches are found we setup a PnP solver
         ORBmatcher matcher(0.7, true);
         vector<MapPoint *> vpMapPointMatches;
+        vector<MapPointWithScore> mpwithScore_lastKey;
+        mpwithScore_lastKey.resize(mCurrentFrame.N, MapPointWithScore(static_cast<MapPoint*>(NULL), -1, 0, 0));
 
-        int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
+        int nmatches = matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches, mpwithScore_lastKey);
 
         if (nmatches < 15)
             return false;
@@ -1354,46 +1379,56 @@ namespace ORB_SLAM2 {
         mCurrentFrame.mvpMapPoints = vpMapPointMatches;
         mCurrentFrame.SetPose(mLastFrame.mTcw);
 
+        int mpscore_size = mpwithScore_lastKey.size();
+        //        LOG_S(INFO) << "mpscore size:" << mpscore_size;
+        neoComputeLastFrameScore(if_has_exframe, lastimRGB, mpwithScore_lastKey, mLastFrame.mTcw, true);
+
+
         vector<neodraw> neodraw_inframe;
         double infoScore = 0;
-        neoBuildInfoMat(mCurrentFrame, false, infoScore, neodraw_inframe);
+        arma::mat infoMat;
+        neoBuildInfoMat(mCurrentFrame, mLastFrame,true, infoMat, mpwithScore_lastKey, neodraw_inframe);
+//        neoBuildInfoMat(mCurrentFrame, false, infoScore, neodraw_inframe);
 //        LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
 
-        cv::Mat img_out;
-        cv::Mat img_in;
-//    mImGray.copyTo(img_in);
-        cv::cvtColor(mImGray, img_in, CV_GRAY2BGR);
-
-//    cv::drawKeypoints(mImGray,
-//                      mCurrentFrame.mvKeys,
-//                      out_img,
-//                      cv::Scalar(0,0,255),
-//                      cv::DrawMatchesFlags::DEFAULT);
-
-        for(vector<neodraw>::iterator iter = neodraw_inframe.begin(); iter!= neodraw_inframe.end(); iter++){
-            double color = (-iter->score );
-            cv::Vec3b color_BRG;
-            convert_to_rainbow(color,color_BRG);
-//        LOG_S(INFO) << "SCORE SINGLE" << color;
-            cv::circle(img_in, cv::Point(iter->position[0],iter->position[1]), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
-
-            // 在最后一次迭代中， 加入上限、下限的颜色
-            if(iter == neodraw_inframe.begin()){
-                convert_to_rainbow(0, color_BRG);
-                cv::circle(img_in, cv::Point(10,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
-
-                convert_to_rainbow(255, color_BRG);
-                cv::circle(img_in, cv::Point(20,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
-            }
-
-        }
-
-
-//    cv::imshow("key_in",img_in);
-        ostringstream file_name;
-        file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
-        flip(img_in,img_out,-1); //翻转图片
-        cv::imwrite(file_name.str(), img_out);
+        drawPointsWrap(neodraw_inframe);
+////////以下代码被wrap函数代替。。。
+//
+//        cv::Mat img_out;
+//        cv::Mat img_in;
+////    mImGray.copyTo(img_in);
+//        cv::cvtColor(mImGray, img_in, CV_GRAY2RGB);
+//
+////    cv::drawKeypoints(mImGray,
+////                      mCurrentFrame.mvKeys,
+////                      out_img,
+////                      cv::Scalar(0,0,255),
+////                      cv::DrawMatchesFlags::DEFAULT);
+//
+//        for(vector<neodraw>::iterator iter = neodraw_inframe.begin(); iter!= neodraw_inframe.end(); iter++){
+//            double color = (-iter->score );
+//            cv::Vec3b color_BRG;
+//            convert_to_rainbow(color,color_BRG);
+////        LOG_S(INFO) << "SCORE SINGLE" << color;
+//            cv::circle(img_in, cv::Point(iter->position[0],iter->position[1]), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+//
+//            // 在最后一次迭代中， 加入上限、下限的颜色
+//            if(iter == neodraw_inframe.begin()){
+//                convert_to_rainbow(0, color_BRG);
+//                cv::circle(img_in, cv::Point(10,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+//
+//                convert_to_rainbow(255, color_BRG);
+//                cv::circle(img_in, cv::Point(20,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+//            }
+//
+//        }
+//
+//
+////    cv::imshow("key_in",img_in);
+//        ostringstream file_name;
+//        file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
+//        flip(img_in,img_out,-1); //翻转图片
+//        cv::imwrite(file_name.str(), img_out);
 
 
         Optimizer::PoseOptimization(&mCurrentFrame);
@@ -1569,9 +1604,10 @@ namespace ORB_SLAM2 {
     }
 
     bool Tracking::neoComputeLastFrameScore(bool if_has_exframe, const cv::Mat & lastimRGB,
-                                            const cv::Mat & lastimDepth,
+//                                            const cv::Mat & lastimDepth,
                                             vector<MapPointWithScore> & lastMp_score,
-                                            const cv::Mat & Tcw_exframe)
+                                            const cv::Mat & Tcw_exframe,
+                                            const bool if_for_KF)
     {
         //// This is for RGB-D...
         //// Stereo mode may need modification.
@@ -1582,7 +1618,11 @@ namespace ORB_SLAM2 {
         cv::Mat img_gray, img_grad;
         cv::Mat tmp_imgx;
         cv::Mat tmp_imgy;
-        cv::cvtColor(lastimRGB, img_gray, CV_RGB2GRAY);
+        if(if_for_KF){
+            img_gray = lastimRGB;
+        } else{
+            cv::cvtColor(lastimRGB, img_gray, CV_RGB2GRAY);
+        }
         cv::Sobel( img_gray, tmp_imgx, -1,
                    1, 0
 //                ,int ksize = 3, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT
@@ -1620,12 +1660,11 @@ namespace ORB_SLAM2 {
                 score_vec.at<float>(2,0) = 0.05f;
                 score_vec.at<float>(3,0) = 1.f;
                 cv::Mat Twc;
-                cv::invert(Tcw_exframe, Twc, cv::DECOMP_CHOLESKY);
+                cv::invert(Tcw_exframe, Twc);
 //                LOG_S(INFO) << "TWC" << Twc;
                 score_vec = Twc * score_vec;
                 lastMp_score[i0].SetScore(score_vec.at<float>(0,0), score_vec.at<float>(1,0), score_vec.at<float>(2,0));
-
-
+                
             }
 
         }
@@ -1646,7 +1685,7 @@ namespace ORB_SLAM2 {
 
         fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
-        vector<MapPointWithScore> mpwithScore_last; //手动指定1500个大小，应该够用了吧。。。。
+        vector<MapPointWithScore> mpwithScore_last; //可以手动指定1500个大小，应该够用了吧。。。。
         mpwithScore_last.resize(mCurrentFrame.mvpMapPoints.size(), MapPointWithScore(static_cast<MapPoint*>(NULL), -1, 0, 0));
 
         // Project points seen in previous frame
@@ -1670,7 +1709,7 @@ namespace ORB_SLAM2 {
 
         int mpscore_size = mpwithScore_last.size();
 //        LOG_S(INFO) << "mpscore size:" << mpscore_size;
-        neoComputeLastFrameScore(if_has_exframe, lastimRGB, lastimDepth, mpwithScore_last, mLastFrame.mTcw);
+        neoComputeLastFrameScore(if_has_exframe, lastimRGB, mpwithScore_last, mLastFrame.mTcw, false);
 
 //        LOG_S(INFO) << "mp 10's score:" << mpwithScore_last[10].score;
         vector<neodraw> neodraw_inframe;
@@ -2544,7 +2583,7 @@ namespace ORB_SLAM2 {
 
     inline void Tracking::synthInfoMat(const Frame *F, const int &kptIdx, const MapPoint *pMP,
                              const arma::mat &H_meas, const float &res_u, const float &res_v,
-                             const arma::mat &H_proj, arma::mat &H_rw,
+                             const arma::mat &H_proj, arma::mat &H_rw_row,
                              const arma::rowvec & sig_uv, const arma::rowvec & sig_p)
     {
 
@@ -2564,7 +2603,7 @@ namespace ORB_SLAM2 {
         Sigma_r = Sigma_p + Sigma_r;
 
         if(arma::chol(W_r, Sigma_r, "lower") == 1){
-            H_rw = arma::inv(W_r) * H_meas;
+            H_rw_row = arma::inv(W_r) * H_meas;
         }
         else{
             // do nothing
@@ -2679,6 +2718,45 @@ namespace ORB_SLAM2 {
         //        std::cout << H << std::endl << std::endl << std::endl;
         //#endif
         //#endif
+
+    }
+
+    inline void Tracking::drawPointsWrap(vector<neodraw> & neodraw_inframe){
+        cv::Mat img_out;
+        cv::Mat img_in;
+//    mImGray.copyTo(img_in);
+        cv::cvtColor(mImGray, img_in, CV_GRAY2RGB);
+
+//    cv::drawKeypoints(mImGray,
+//                      mCurrentFrame.mvKeys,
+//                      out_img,
+//                      cv::Scalar(0,0,255),
+//                      cv::DrawMatchesFlags::DEFAULT);
+
+        for(vector<neodraw>::iterator iter = neodraw_inframe.begin(); iter!= neodraw_inframe.end(); iter++){
+            double color = (-iter->score );
+            cv::Vec3b color_BRG;
+            convert_to_rainbow(color,color_BRG);
+//        LOG_S(INFO) << "SCORE SINGLE" << color;
+            cv::circle(img_in, cv::Point(iter->position[0],iter->position[1]), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+
+            // 在最后一次迭代中， 加入上限、下限的颜色
+            if(iter == neodraw_inframe.begin()){
+                convert_to_rainbow(0, color_BRG);
+                cv::circle(img_in, cv::Point(10,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+
+                convert_to_rainbow(255, color_BRG);
+                cv::circle(img_in, cv::Point(20,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
+            }
+
+        }
+
+
+//    cv::imshow("key_in",img_in);
+        ostringstream file_name;
+        file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
+        flip(img_in,img_out,-1); //翻转图片
+        cv::imwrite(file_name.str(), img_out);
 
     }
 

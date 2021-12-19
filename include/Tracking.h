@@ -64,7 +64,9 @@ public:
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
     cv::Mat GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp);
-    cv::Mat GrabImageRGBD(const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp, const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe);
+    cv::Mat GrabImageRGBD(const int frame_n, const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp,
+                          const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe,
+                          cv::Mat &imgray_LastKeyframe); // this is the neo version
         cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
@@ -140,7 +142,8 @@ protected:
 
     void CheckReplacedInLastFrame();
     bool TrackReferenceKeyFrame();
-    bool neoTrackReferenceKeyFrame(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth);
+    bool neoTrackReferenceKeyFrame(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth,
+                                   const cv::Mat & imgray_keyframe);
     void UpdateLastFrame();
     bool TrackWithMotionModel();
     bool neoTrackWithMotionModel(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth);
@@ -163,7 +166,7 @@ protected:
 
     inline void synthInfoMat(const Frame *F, const int &kptIdx, const MapPoint *pMP,
                              const arma::mat &H_meas, const float &res_u, const float &res_v,
-                             const arma::mat &H_proj, arma::mat &H_rw,
+                             const arma::mat &H_proj, arma::mat &H_rw_row,
                              const arma::rowvec & sig_uv, const arma::rowvec & sig_p);
 
     // sig_uv 应当是一个2元素rowvec。 sig_p 应当是一个三元素rowvec。
@@ -242,7 +245,8 @@ protected:
 
     list<MapPoint*> mlpTemporalPoints;
 
-    void neoRGBD_Track(bool if_has_exframe, const cv::Mat & exframe_rgb, const cv::Mat & exframe_depth);
+    void neoRGBD_Track(bool if_has_exframe, const cv::Mat & exframe_rgb, const cv::Mat & exframe_depth,
+                       cv::Mat & ex_keyframe_gray);
 
 
     bool neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model,
@@ -363,8 +367,11 @@ protected:
     neoGet_H_subBlock(const cv::Mat &Tcw, const arma::rowvec &yi, arma::mat &H13, arma::mat &H47, arma::mat &dhu_dhrl,
                       const bool check_viz, float &u, float &v);
 
-    bool neoComputeLastFrameScore(bool if_has_exframe, const cv::Mat &lastimRGB, const cv::Mat &lastimDepth,
-                                  vector<MapPointWithScore> &lastMp_score, const cv::Mat & Tcw_exframe);
+    bool neoComputeLastFrameScore(bool if_has_exframe, const cv::Mat &lastimRGB,
+                                  vector<MapPointWithScore> &lastMp_score, const cv::Mat & Tcw_exframe,
+                                  const bool if_for_KF);
+
+    void drawPointsWrap(vector<neodraw> &neodraw_inframe);
 };
 
 } //namespace ORB_SLAM
