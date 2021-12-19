@@ -486,8 +486,8 @@ bool MapPointWithScore::SetScore(float inx, float iny, float inz) {
 }
 
 bool MapPointWithScore::SetUV(float u_to_set, float v_to_set) {
-    u_to_set = u;
-    v_to_set = v;
+    u = u_to_set;
+    v = v_to_set;
     return true;
 }
 

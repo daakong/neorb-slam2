@@ -171,9 +171,10 @@ protected:
 
     // sig_uv 应当是一个2元素rowvec。 sig_p 应当是一个三元素rowvec。
     inline void computerSigma(const Frame *F, const int &kptIdx, const MapPoint *pMP,
-                                        const arma::mat &H_meas, const float &res_u, const float &res_v,
-                                        const arma::mat &H_proj, arma::mat &H_rw,
-                                        arma::rowvec & sig_uv, arma::rowvec & sig_p, const cv::Mat & score_3d_homo);
+                              const arma::mat &H_meas, const float &res_u, const float &res_v,
+                              const arma::mat &H_proj, arma::mat &H_rw,
+                              arma::rowvec & sig_uv, arma::rowvec & sig_p, const cv::Mat & score_3d_homo,
+                              const cv::Mat & img_grad_current);
     // In case of performing only localization, this flag is true when there are no matches to
     // points in the map. Still tracking will continue if there are enough matches with temporal points.
     // In that case we are doing visual odometry. The system will try to do relocalization to recover
@@ -251,7 +252,7 @@ protected:
 
     bool neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model,
                                    double& score, vector<neodraw>& neodraw_vec);
-    bool neoBuildInfoMat(Frame &inFrame, Frame &exFrame, bool call_from_motion_model, arma::mat & infoMat, vector<MapPointWithScore>& mp_exframe_withScore,
+    bool neoBuildInfoMat(bool if_has_exframe, Frame &inFrame, Frame &exFrame, bool call_from_motion_model, arma::mat & infoMat, vector<MapPointWithScore>& mp_exframe_withScore,
                          vector<neodraw> &neodraw_vec);
 
     bool
@@ -371,7 +372,9 @@ protected:
                                   vector<MapPointWithScore> &lastMp_score, const cv::Mat & Tcw_exframe,
                                   const bool if_for_KF);
 
-    void drawPointsWrap(vector<neodraw> &neodraw_inframe);
+    void drawPointsWrap(vector<neodraw> &neodraw_inframe, int matches0, float  score0);
+
+//    bool computeGradImg(const cv::Mat &gray_img_in, cv::Mat &grad_img_out);
 };
 
 } //namespace ORB_SLAM

@@ -29,6 +29,8 @@
 
 #include<stdint-gcc.h>
 
+#include "neo_utility.h"
+
 using namespace std;
 
 namespace ORB_SLAM2
@@ -271,6 +273,7 @@ bool ORBmatcher::CheckDistEpipolarLine(const cv::KeyPoint &kp1,const cv::KeyPoin
                             if(v_last < pKF->mnMinY || v_last > pKF->mnMaxY)
                                 continue;
 
+//                            LOG_S(INFO) << "U_LAST" << u_last << " V_LAST" << v_last;
                             mpwithScore_lastKey[bestIdxF].SetPMP(pMP);
                             mpwithScore_lastKey[bestIdxF].SetUV(u_last, v_last);
 
@@ -1625,6 +1628,7 @@ int ORBmatcher::SearchByProjection(Frame &CurrentFrame, const Frame &LastFrame, 
 //                        //////Push back会造成数量的不统一，停用pushback，直接使用set赋值。
 //                        MapPointWithScore mpScore(pMP, -1, u_last, v_last);
 //                        MapPoints_LastFrame.push_back(mpScore);
+//                         LOG_S(INFO) << "U_LAST" << u_last << " V_LAST" << v_last;
                          MapPoints_LastFrame[bestIdx2].SetUV(u_last, v_last);
                          MapPoints_LastFrame[bestIdx2].SetPMP(pMP);
 

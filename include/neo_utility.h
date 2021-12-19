@@ -10,6 +10,8 @@
 
 #define NEO_FLIP_IMG
 
+#define TIME_DEBUG
+
 namespace  ORB_SLAM2 {
 //
 //    inline bool log_flag(bool flag);
@@ -21,6 +23,8 @@ namespace  ORB_SLAM2 {
 
 
     float localEntropy4uv(cv::Mat img, int u_to_entropy, int v_to_entropy);
+    void computeGradImg(const cv::Mat & gray_img_in, cv::Mat & grad_img_out);
+    float uvScore_uni(float entropy_in, float grad_in);
 
 
 }

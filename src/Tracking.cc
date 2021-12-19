@@ -228,9 +228,9 @@ namespace ORB_SLAM2 {
     }
 
     cv::Mat Tracking::GrabImageRGBD( const int frame_n, const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp,
-                                    const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe,
-                                    cv::Mat &imgray_LastKeyframe
-                                    ) {
+                                     const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe,
+                                     cv::Mat &imgray_LastKeyframe
+    ) {
         mImGray = imRGB;
         cv::Mat imDepth = imD;
 
@@ -1003,7 +1003,7 @@ namespace ORB_SLAM2 {
 //    LOG_S(INFO) << "H_C" << endl << H_c;
         arma::mat infoMat = H_c.t() * H_c;
         score = logDet(infoMat);
-        LOG_S(INFO) << "info Mat" << endl << infoMat;
+//        LOG_S(INFO) << "info Mat" << endl << infoMat;
 
 //    LOG_S(INFO) << "Score computing finished. Frame" << inFrame.mnId << " Score:" << score ;
 
@@ -1012,9 +1012,15 @@ namespace ORB_SLAM2 {
     }
 
 
-    bool Tracking::neoBuildInfoMat(Frame &inFrame, Frame &exFrame, bool call_from_motion_model, arma::mat & info_mat,
+    bool Tracking::neoBuildInfoMat(bool if_has_exframe, Frame &inFrame, Frame &exFrame, bool call_from_motion_model, arma::mat & info_mat,
                                    vector<MapPointWithScore>& mp_exframe_withScore, vector<neodraw> &neodraw_vec) {
 
+        if(!if_has_exframe){
+            LOG_S(WARNING) << "No exframe!";
+            info_mat = arma::zeros<arma::mat>(6,6);
+            return false;
+
+        }
 //    LOG_S(INFO) << "entering neo info map";
 
         arma::mat  H_meas, H_proj, H_disp, H_rw;
@@ -1024,6 +1030,12 @@ namespace ORB_SLAM2 {
         vector<arma::mat> h_wr_row_vec;
         arma::mat infoMat_ = arma::zeros<arma::mat>(6,6);
         int matched_id = 0;
+#ifdef  TIME_DEBUG
+        LOG_S(INFO) << "Timer 3.1";
+#endif
+        cv::Mat img_gradient;
+        computeGradImg(mImGray, img_gradient);
+
 
         for (int i = 0; i < inFrame.mvpMapPoints.size(); i++) {
             MapPoint *pMp = inFrame.mvpMapPoints[i];
@@ -1082,43 +1094,53 @@ namespace ORB_SLAM2 {
 
                     arma::rowvec sigma_uv, sigma_p;
 
-                    computerSigma(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw, sigma_uv, sigma_p, score_3d_homo);
-
+                    computerSigma(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw,
+                                  sigma_uv, sigma_p, score_3d_homo,img_gradient);
+//                    LOG_S(INFO) << "SCORE 3D HOMO:" << score_3d_homo;
                     synthInfoMat(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw, sigma_uv, sigma_p);
 //                    reWeightInfoMat(&mCurrentFrame, i, pMp, H_meas, res_u, res_v, H_proj, H_rw);
 //                LOG_S(INFO) << "H_measure:" << endl << H_meas << endl << "H_rw:" << endl << H_rw;
                     arma::mat point_infoMat = H_rw.t() * H_rw;
-                    if(infoMat_.size()==point_infoMat.size()){
-                        infoMat_ = infoMat_ + point_infoMat;
-                    } else{
-                        // doing nothing
-                    }
-                    float single_point_score = logDet(point_infoMat);
+//                    if(infoMat_.size()==point_infoMat.size()){
+//                        infoMat_ = infoMat_ + point_infoMat;
+//                    } else{
+//                        // doing nothing
+//                    }
+//                    float single_point_score = logDet(point_infoMat);
+                    float single_point_score = log(arma::det(point_infoMat));
                     drawPoint.score = single_point_score;
                     pointsInfoMatrices.push_back(point_infoMat);
                     h_wr_row_vec.push_back(H_rw);
                     neodraw_vec.push_back(drawPoint);
                 }
             }
+
         }
 //        LOG_S(INFO) << "important!! matched" << matched_id << ", size:" << mp_exframe_withScore.size();
 
-//        arma::mat H_c;
-//        for (vector<arma::mat>::iterator iter = h_wr_row_vec.begin(); iter != h_wr_row_vec.end(); iter++) {
-//            if (iter == h_wr_row_vec.begin()) {
-//                H_c = *iter;
-//            } else {
-//                H_c = arma::join_vert(H_c, *iter);
-//            }
-//        }
+        arma::mat H_c;
+        for (vector<arma::mat>::iterator iter = h_wr_row_vec.begin(); iter != h_wr_row_vec.end(); iter++) {
+            if (iter == h_wr_row_vec.begin()) {
+                H_c = *iter;
+            } else {
+                H_c = arma::join_vert(H_c, *iter);
+            }
+        }
+#ifdef  TIME_DEBUG
+        LOG_S(INFO) << "Timer 3.4";
+#endif
+
 //    LOG_S(INFO) << "H_C" << endl << H_c;
-//        infoMat_ = H_c.t() * H_c;
+        infoMat_ = H_c.t() * H_c;
 
         info_mat = infoMat_;
         float score = logDet(infoMat_);
-        LOG_S(INFO) << "info Mat" << endl << infoMat_;
+        LOG_S(INFO) << "info Mat score:" << score << ":"<< endl << infoMat_ ;
 
 //    LOG_S(INFO) << "Score computing finished. Frame" << inFrame.mnId << " Score:" << score ;
+#ifdef  TIME_DEBUG
+        LOG_S(INFO) << "Timer 3.5";
+#endif
 
 
         return true;
@@ -1167,10 +1189,10 @@ namespace ORB_SLAM2 {
             // 如果深度太小，则输出0
             //todo
         } else{
-          dh_dp_ = {
-                  {fu / homo_p.at<float>(2,0), 0.0f, -homo_p.at<float>(0,0) * fu / (homo_p.at<float>(2,0) * homo_p.at<float>(2,0))},
-                  {0.0f, fv/homo_p.at<float>(2,0),  -homo_p.at<float>(1,0) * fu / (homo_p.at<float>(2,0) * homo_p.at<float>(2,0))}
-          };
+            dh_dp_ = {
+                    {fu / homo_p.at<float>(2,0), 0.0f, -homo_p.at<float>(0,0) * fu / (homo_p.at<float>(2,0) * homo_p.at<float>(2,0))},
+                    {0.0f, fv/homo_p.at<float>(2,0),  -homo_p.at<float>(1,0) * fu / (homo_p.at<float>(2,0) * homo_p.at<float>(2,0))}
+            };
         }
 
 //        if (fabs(hrl(2, 0)) < 1e-6) {
@@ -1378,20 +1400,38 @@ namespace ORB_SLAM2 {
 
         mCurrentFrame.mvpMapPoints = vpMapPointMatches;
         mCurrentFrame.SetPose(mLastFrame.mTcw);
-
+#ifdef TIME_DEBUG
+        LOG_S(INFO) << "Timer 1";
+#endif
         int mpscore_size = mpwithScore_lastKey.size();
         //        LOG_S(INFO) << "mpscore size:" << mpscore_size;
         neoComputeLastFrameScore(if_has_exframe, lastimRGB, mpwithScore_lastKey, mLastFrame.mTcw, true);
+#ifdef TIME_DEBUG
+        LOG_S(INFO) << "Timer 2";
+#endif
 
 
         vector<neodraw> neodraw_inframe;
-        double infoScore = 0;
+        float infoScore = 0;
         arma::mat infoMat;
-        neoBuildInfoMat(mCurrentFrame, mLastFrame,true, infoMat, mpwithScore_lastKey, neodraw_inframe);
+#ifdef TIME_DEBUG
+        LOG_S(INFO) << "Timer 3";
+#endif
+
+        neoBuildInfoMat(if_has_exframe, mCurrentFrame, mLastFrame,true, infoMat, mpwithScore_lastKey, neodraw_inframe);
 //        neoBuildInfoMat(mCurrentFrame, false, infoScore, neodraw_inframe);
 //        LOG_S(INFO) << "InfoMat Frame" << mCurrentFrame.mnId << ", Score:" << infoScore << ", nmatches:" << nmatches;
+#ifdef TIME_DEBUG
 
-        drawPointsWrap(neodraw_inframe);
+        LOG_S(INFO) << "Timer 4";
+        #endif
+
+        infoScore = logDet(infoMat);
+        drawPointsWrap(neodraw_inframe, nmatches, infoScore);
+#ifdef  TIME_DEBUG
+        LOG_S(INFO) << "Timer 5";
+#endif
+
 ////////以下代码被wrap函数代替。。。
 //
 //        cv::Mat img_out;
@@ -1609,47 +1649,45 @@ namespace ORB_SLAM2 {
                                             const cv::Mat & Tcw_exframe,
                                             const bool if_for_KF)
     {
+        bool debug_for_score = false;
         //// This is for RGB-D...
         //// Stereo mode may need modification.
         if (!if_has_exframe){
-            LOG_S(ERROR) << "HAS EXFRAME IS FALSE!!";
+            LOG_S(WARNING) << "HAS EXFRAME IS FALSE!!";
             return false;
         }
         cv::Mat img_gray, img_grad;
-        cv::Mat tmp_imgx;
-        cv::Mat tmp_imgy;
         if(if_for_KF){
             img_gray = lastimRGB;
         } else{
             cv::cvtColor(lastimRGB, img_gray, CV_RGB2GRAY);
         }
-        cv::Sobel( img_gray, tmp_imgx, -1,
-                   1, 0
-//                ,int ksize = 3, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT
-        );
-        cv::convertScaleAbs(tmp_imgx, tmp_imgx);
-        cv::Sobel( img_gray, tmp_imgy, -1,
-                   0, 1
-//                ,int ksize = 3, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT
-        );
-        cv::convertScaleAbs(tmp_imgy, tmp_imgy);
-        cv::addWeighted(tmp_imgx, 0.5, tmp_imgy, 0.5, 0, img_grad);
-         cv::imwrite("/home/da/img_grad.png", img_grad);
+        computeGradImg(img_gray, img_grad);
 //        cv::convertScaleAbs(tmp_img, img_grad); // 转回uint8
         int fsize = lastMp_score.size();
         for(int i0 = 0; i0 < fsize; i0 ++ ) {
             if(lastMp_score[i0].target_pMp){
+                if(debug_for_score)
+                    LOG_S(INFO) << lastMp_score[i0].target_pMp;
                 float score = -1;
                 MapPoint *pmp_tmp = lastMp_score[i0].GetPMP();
-                int u_tmp = (int) lastMp_score[i0].u;
-                int v_tmp = (int) lastMp_score[i0].v;
-
+                int u_tmp = (int) lastMp_score[i0].GetU();
+                int v_tmp = (int) lastMp_score[i0].GetV();
+                if(debug_for_score)
+                    LOG_S(INFO) << "u" << lastMp_score[i0].GetU() << ",v" << lastMp_score[i0].GetV() << ", i0:" << i0;
                 float entropy = localEntropy4uv(img_gray, u_tmp, v_tmp);
 
-                float grad_squ = img_grad.at<uint>(u_tmp, v_tmp);
+                if(debug_for_score)
+                    LOG_S(INFO) << "Entropy:" << entropy;
+                float grad_squ = img_grad.at<uchar>(v_tmp, u_tmp);
+                if(debug_for_score)
+                    LOG_S(INFO) << "GRAD:" << grad_squ
+                                << ", u" << u_tmp << ",v" << v_tmp;
 
-                score = ( entropy * grad_squ )/ 40.f;
-                LOG_S(INFO) << "SCORE: " << score;
+//                score = ( entropy * grad_squ )/ 40.f;
+                score = uvScore_uni(entropy, grad_squ);
+                if(debug_for_score)
+                    LOG_S(INFO) << "SCORE: " << score;
 //                score = entropy / 20.f + grad_squ / 40.f;
 //            lastMp_score[i0].SetScore_x(score);
 //            lastMp_score[i0].SetScore_y(score);
@@ -1663,8 +1701,16 @@ namespace ORB_SLAM2 {
                 cv::invert(Tcw_exframe, Twc);
 //                LOG_S(INFO) << "TWC" << Twc;
                 score_vec = Twc * score_vec;
+                if(debug_for_score)
+                    LOG_S(INFO) << "SCORE_VEC:" << endl << score_vec;
                 lastMp_score[i0].SetScore(score_vec.at<float>(0,0), score_vec.at<float>(1,0), score_vec.at<float>(2,0));
-                
+//                LOG_S(INFO) << "FLAG2";
+
+            } else{
+
+//                LOG_S(INFO) << "YES FLAG! No pmp.";
+//                int flag = 0;
+
             }
 
         }
@@ -1706,62 +1752,36 @@ namespace ORB_SLAM2 {
 
         if(nmatches<20)
             return false;
+#ifdef TIME_DEBUG
+        LOG_S(INFO) << "Timer 1";
+#endif
 
         int mpscore_size = mpwithScore_last.size();
 //        LOG_S(INFO) << "mpscore size:" << mpscore_size;
         neoComputeLastFrameScore(if_has_exframe, lastimRGB, mpwithScore_last, mLastFrame.mTcw, false);
 
+#ifdef TIME_DEBUG
+        LOG_S(INFO) << "Timer 2";
+#endif
+
 //        LOG_S(INFO) << "mp 10's score:" << mpwithScore_last[10].score;
         vector<neodraw> neodraw_inframe;
         arma::mat infoMat;
-        neoBuildInfoMat(mCurrentFrame, mLastFrame,true, infoMat, mpwithScore_last, neodraw_inframe);
+#ifdef TIME_DEBUG
+        LOG_S(INFO) << "Timer 3";
+#endif
+        neoBuildInfoMat(if_has_exframe, mCurrentFrame, mLastFrame,true, infoMat, mpwithScore_last, neodraw_inframe);
         int match_before_discard = nmatches;
         float infoScore = logDet(infoMat);
+#ifdef TIME_DEBUG
 
-        cv::Mat img_out;
-        cv::Mat img_in;
-//    mImGray.copyTo(img_in);
-        cv::cvtColor(mImGray, img_in, CV_GRAY2BGR);
-
-//    cv::drawKeypoints(mImGray,
-//                      mCurrentFrame.mvKeys,
-//                      out_img,
-//                      cv::Scalar(0,0,255),
-//                      cv::DrawMatchesFlags::DEFAULT);
-
-        for(vector<neodraw>::iterator iter = neodraw_inframe.begin(); iter!= neodraw_inframe.end(); iter++){
-            double color = (-iter->score );
-            cv::Vec3b color_BRG;
-            convert_to_rainbow(color,color_BRG);
-//        LOG_S(INFO) << "SCORE SINGLE" << color;
-            cv::circle(img_in, cv::Point(iter->position[0],iter->position[1]), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
-
-            // 在最后一次迭代中， 加入上限、下限的颜色
-            if(iter == neodraw_inframe.begin()){
-                convert_to_rainbow(0, color_BRG);
-                cv::circle(img_in, cv::Point(10,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
-
-                convert_to_rainbow(255, color_BRG);
-                cv::circle(img_in, cv::Point(20,10), 6, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]));
-            }
-
-        }
-
-
-//    cv::imshow("key_in",img_in);
-        ostringstream file_name;
-        file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
-#ifdef NEO_FLIP_IMG
-        flip(img_in,img_out,-1); //翻转图片
-#else
-        img_out = img_in.clone();
+        LOG_S(INFO) << "Timer 4";
 #endif
-        ostringstream text;
-        text << "Points:" << nmatches << ",score:" << infoScore;
-        cv::Vec3b color_BRG;
-        convert_to_rainbow(255, color_BRG);
-        cv::putText(img_out, text.str(), cv::Point(50, 50), cv::FONT_HERSHEY_PLAIN,0.8, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]), 2);
-        cv::imwrite(file_name.str(), img_out);
+
+        drawPointsWrap(neodraw_inframe, nmatches, infoScore);
+#ifdef  TIME_DEBUG
+        LOG_S(INFO) << "Timer 5";
+#endif
 
         // Optimize frame pose with all matches
         Optimizer::PoseOptimization(&mCurrentFrame);
@@ -1831,7 +1851,7 @@ namespace ORB_SLAM2 {
             return false;
 
         int mpscore_size = mpwithScore_last.size();
-        LOG_S(INFO) << "mpscore size:" << mpscore_size;
+//        LOG_S(INFO) << "mpscore size:" << mpscore_size;
 
 
         vector<neodraw> neodraw_inframe;
@@ -2582,15 +2602,16 @@ namespace ORB_SLAM2 {
 
 
     inline void Tracking::synthInfoMat(const Frame *F, const int &kptIdx, const MapPoint *pMP,
-                             const arma::mat &H_meas, const float &res_u, const float &res_v,
-                             const arma::mat &H_proj, arma::mat &H_rw_row,
-                             const arma::rowvec & sig_uv, const arma::rowvec & sig_p)
+                                       const arma::mat &H_meas, const float &res_u, const float &res_v,
+                                       const arma::mat &H_proj, arma::mat &H_rw_row,
+                                       const arma::rowvec & sig_uv, const arma::rowvec & sig_p)
     {
 
         int measSz = H_meas.n_rows;
         arma::mat Sigma_r(measSz, measSz), W_r(measSz, measSz);
         Sigma_r.eye();
         Sigma_r = Sigma_r * sig_uv(0,0);
+
 
         arma::mat  Sigma_p ={
                 {sig_p(0,0) , 0.f, 0.f},
@@ -2602,7 +2623,10 @@ namespace ORB_SLAM2 {
 
         Sigma_r = Sigma_p + Sigma_r;
 
-        if(arma::chol(W_r, Sigma_r, "lower") == 1){
+        bool chol_state = arma::chol(W_r, Sigma_r,"lower");
+        if(chol_state){
+//            LOG_S(INFO) << "sIGMA_R:" << Sigma_r;
+//            LOG_S(INFO) << "W_R:" << W_r;
             H_rw_row = arma::inv(W_r) * H_meas;
         }
         else{
@@ -2655,18 +2679,27 @@ namespace ORB_SLAM2 {
 
 
     inline void Tracking::computerSigma(const Frame *F, const int &kptIdx, const MapPoint *pMP,
-                                       const arma::mat &H_meas, const float &res_u, const float &res_v,
-                                       const arma::mat &H_proj, arma::mat &H_rw,
-                                       arma::rowvec & sig_uv, arma::rowvec & sig_p,
-                                       const cv::Mat & score_3d_homo)
+                                        const arma::mat &H_meas, const float &res_u, const float &res_v,
+                                        const arma::mat &H_proj, arma::mat &H_rw,
+                                        arma::rowvec & sig_uv, arma::rowvec & sig_p,
+                                        const cv::Mat & score_3d_homo,
+                                        const cv::Mat & img_grad_current)
     {
 
         sig_uv = {1.f, 1.f};
+//        cv::Mat img_grad_current;
+//        computeGradImg(mImGray, img_grad_current);
+        float entropy_l = localEntropy4uv(mImGray, res_u, res_v);
+        float grad_squ_l = img_grad_current.at<uchar>(int(res_v), int(res_u));
+        float score_tmp = uvScore_uni(entropy_l, grad_squ_l);
+        sig_uv = {1.f + score_tmp/150.f, 1.f + score_tmp/150.f};
+
         if (F != NULL && kptIdx >= 0 && kptIdx < F->mvKeysUn.size())
         {
             float level_factor = F->mvLevelSigma2[F->mvKeysUn[kptIdx].octave];
             sig_uv = sig_uv * level_factor;
         }
+//        LOG_S(INFO) << "SIGUV:"<< sig_uv;
 
         sig_p = {1.f, 1.f, 1.f};
 
@@ -2674,6 +2707,7 @@ namespace ORB_SLAM2 {
         score_proj = F->mTcw * score_3d_homo;
 
         sig_p = {score_proj.at<float>(0,0), score_proj.at<float>(1,0), score_proj.at<float>(2,0)};
+
 
 //        int measSz = H_meas.n_rows;
 //        arma::mat Sigma_r(measSz, measSz), W_r(measSz, measSz);
@@ -2721,7 +2755,7 @@ namespace ORB_SLAM2 {
 
     }
 
-    inline void Tracking::drawPointsWrap(vector<neodraw> & neodraw_inframe){
+    inline void Tracking::drawPointsWrap(vector<neodraw> & neodraw_inframe, int matches0, float  score0){
         cv::Mat img_out;
         cv::Mat img_in;
 //    mImGray.copyTo(img_in);
@@ -2734,7 +2768,7 @@ namespace ORB_SLAM2 {
 //                      cv::DrawMatchesFlags::DEFAULT);
 
         for(vector<neodraw>::iterator iter = neodraw_inframe.begin(); iter!= neodraw_inframe.end(); iter++){
-            double color = (-iter->score );
+            double color = (-iter->score )  * 2;
             cv::Vec3b color_BRG;
             convert_to_rainbow(color,color_BRG);
 //        LOG_S(INFO) << "SCORE SINGLE" << color;
@@ -2755,10 +2789,24 @@ namespace ORB_SLAM2 {
 //    cv::imshow("key_in",img_in);
         ostringstream file_name;
         file_name << "/home/da/active/key_dir/frame" << mCurrentFrame.mnId << ".png";
+#ifdef NEO_FLIP_IMG
         flip(img_in,img_out,-1); //翻转图片
+#else
+        img_out = img_in.clone();
+#endif
+        ostringstream text;
+        text << "Points:" << matches0 << ",score:" << score0;
+        cv::Vec3b color_BRG;
+        convert_to_rainbow(255, color_BRG);
+        cv::putText(img_out, text.str(), cv::Point(50, 50), cv::FONT_HERSHEY_COMPLEX,1.5, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]), 2);
         cv::imwrite(file_name.str(), img_out);
 
+
     }
+
+
+
+
 
 
 } //namespace ORB_SLAM

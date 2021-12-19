@@ -112,8 +112,8 @@ int main(int argc, char **argv)
         if(!enable_visualization){
             LOG_S(INFO) << "To track frame" << ni << "!!!";
         }
-        // Pass the image to the SLAM system
-        SLAM.TrackRGBD(imRGB,imD,tframe);
+        ////// Pass the image to the SLAM system
+//        SLAM.TrackRGBD(imRGB,imD,tframe);
 //        if(ni == 0) {
 //            SLAM.neoTrackRGBD(imRGB, imD, tframe);
 //        }

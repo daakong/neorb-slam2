@@ -3,6 +3,11 @@
 //
 #include "neo_utility.h"
 #include "loguru.hpp"
+#include<opencv2/core/core.hpp>
+#include<opencv2/features2d/features2d.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
+
 
 namespace  ORB_SLAM2 {
 //    inline bool log_flag(bool flag) {
@@ -55,8 +60,8 @@ namespace  ORB_SLAM2 {
 //        for (int i = w; i < m - w; i++) {
 //            for (int j = w; j < n - w;j++) {
         cv::Mat Hist = cv::Mat::zeros(1, 400,CV_32F);
-        int m_loop = u_to_entropy;
-        int n_loop = v_to_entropy;
+        int m_loop = v_to_entropy;
+        int n_loop = u_to_entropy;
         for (int p = m_loop - w; p <= m_loop + w;p++)
         {
             for (int q = n_loop - w; q <= n_loop + w;q++) {
@@ -104,6 +109,30 @@ namespace  ORB_SLAM2 {
         return out_entropy;
     }
 
+    void computeGradImg(const cv::Mat & gray_img_in, cv::Mat & grad_img_out)
+    {
+        cv::Mat img_gray, img_grad;
+        cv::Mat tmp_imgx;
+        cv::Mat tmp_imgy;
+        img_gray = gray_img_in;
+        cv::Sobel(img_gray, tmp_imgx, -1,
+                  1, 0
+//                ,int ksize = 3, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT
+        );
+        cv::convertScaleAbs(tmp_imgx, tmp_imgx);
+        cv::Sobel(img_gray, tmp_imgy, -1,
+                  0, 1
+//                ,int ksize = 3, double scale = 1, double delta = 0, int borderType = BORDER_DEFAULT
+        );
+        cv::convertScaleAbs(tmp_imgy, tmp_imgy);
+        cv::addWeighted(tmp_imgx, 0.5, tmp_imgy, 0.5, 0, img_grad);
+        cv::imwrite("/home/da/img_grad.png", img_grad);
+        img_grad.copyTo(grad_img_out);
+    }
+
+    float uvScore_uni(float entropy_in, float grad_in){
+        return  (entropy_in * grad_in) / 30.f;
+    }
 
 
 
