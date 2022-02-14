@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <time.h>
 
+
 bool has_suffix(const std::string &str, const std::string &suffix) {
     std::size_t index = str.find(suffix, str.size() - suffix.size());
     return (index != std::string::npos);
@@ -228,7 +229,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
 }
 
 cv::Mat System::neoTrackRGBD(const int ni, const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp,
-                             const cv::Mat &im_last, const cv::Mat &depth_last, cv::Mat & last_key_imGray)
+                             const cv::Mat &im_last, const cv::Mat &depth_last, cv::Mat & last_key_imGray, FrameLog & logInfoThisFrame)
     {
         if(mSensor!=RGBD)
         {
@@ -270,7 +271,7 @@ cv::Mat System::neoTrackRGBD(const int ni, const cv::Mat &im, const cv::Mat &dep
             }
         }
 
-        cv::Mat Tcw = mpTracker->GrabImageRGBD(ni, im,depthmap,timestamp, im_last, depth_last, last_key_imGray);
+        cv::Mat Tcw = mpTracker->GrabImageRGBD(ni, im,depthmap,timestamp, im_last, depth_last, last_key_imGray, logInfoThisFrame);
 
         unique_lock<mutex> lock2(mMutexState);
         mTrackingState = mpTracker->mState;

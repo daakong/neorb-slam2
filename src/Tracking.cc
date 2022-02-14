@@ -229,7 +229,7 @@ namespace ORB_SLAM2 {
 
     cv::Mat Tracking::GrabImageRGBD( const int frame_n, const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp,
                                      const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe,
-                                     cv::Mat &imgray_LastKeyframe
+                                     cv::Mat &imgray_LastKeyframe, FrameLog & frameLog
     ) {
         mImGray = imRGB;
         cv::Mat imDepth = imD;
@@ -255,9 +255,9 @@ namespace ORB_SLAM2 {
 //    Track();
 
         if(frame_n == 0){
-            neoRGBD_Track(false, imLastframe, imDepthLastframe, imgray_LastKeyframe);
+            neoRGBD_Track(false, imLastframe, imDepthLastframe, imgray_LastKeyframe, frameLog);
         } else{
-            neoRGBD_Track(true, imLastframe, imDepthLastframe, imgray_LastKeyframe);
+            neoRGBD_Track(true, imLastframe, imDepthLastframe, imgray_LastKeyframe, frameLog);
         }
 
         return mCurrentFrame.mTcw.clone();
@@ -290,7 +290,7 @@ namespace ORB_SLAM2 {
     }
 
     void Tracking::neoRGBD_Track(bool if_has_exframe, const cv::Mat &exframe_rgb, const cv::Mat & exframe_depth,
-                                 cv::Mat & ex_keyframe_gray) {
+                                 cv::Mat & ex_keyframe_gray, FrameLog & frameLog) {
         if (mState == NO_IMAGES_YET) {
             mState = NOT_INITIALIZED;
         }
@@ -331,14 +331,14 @@ namespace ORB_SLAM2 {
                     if (mVelocity.empty() || mCurrentFrame.mnId < mnLastRelocFrameId + 2) {
 //                        LOG_S(INFO) << "To track reference frame here." << mCurrentFrame.mnId;
 //                        bOK = TrackReferenceKeyFrame();
-                        bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth, ex_keyframe_gray);
+                        bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth, ex_keyframe_gray, frameLog);
                     } else {
 //                        LOG_S(INFO) << "To track motion model here." << mCurrentFrame.mnId;
 //                        bOK = TrackWithMotionModel();
-                        bOK = neoTrackWithMotionModel(if_has_exframe, exframe_rgb, exframe_depth);
+                        bOK = neoTrackWithMotionModel(if_has_exframe, exframe_rgb, exframe_depth, frameLog);
                         if (!bOK){
 //                            bOK = TrackReferenceKeyFrame();
-                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth, ex_keyframe_gray);
+                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth, ex_keyframe_gray, frameLog);
                         }
                     }
                 } else {
@@ -356,10 +356,10 @@ namespace ORB_SLAM2 {
                         if (!mVelocity.empty()) {
 //                            LOG_S(INFO) << "To track motion model.";
 //                            bOK = TrackWithMotionModel();
-                            bOK = neoTrackWithMotionModel(if_has_exframe, exframe_rgb, exframe_depth);
+                            bOK = neoTrackWithMotionModel(if_has_exframe, exframe_rgb, exframe_depth, frameLog);
                         } else {
 //                            LOG_S(INFO) << "To track key frame.";
-                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth,ex_keyframe_gray);
+                            bOK = neoTrackReferenceKeyFrame(if_has_exframe, exframe_rgb, exframe_depth,ex_keyframe_gray, frameLog);
 //                            bOK = TrackReferenceKeyFrame();
                         }
 
@@ -1382,7 +1382,7 @@ namespace ORB_SLAM2 {
     }
 
     bool Tracking::neoTrackReferenceKeyFrame(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth,
-                                             const cv::Mat & imgray_keyframe) {
+                                             const cv::Mat & imgray_keyframe, FrameLog & frameLog) {
         // Compute Bag of Words vector
         mCurrentFrame.ComputeBoW();
 
@@ -1427,7 +1427,7 @@ namespace ORB_SLAM2 {
         #endif
 
         infoScore = logDet(infoMat);
-        drawPointsWrap(neodraw_inframe, nmatches, infoScore);
+        drawPointsWrap(neodraw_inframe, nmatches, infoScore, frameLog);
 #ifdef  TIME_DEBUG
         LOG_S(INFO) << "Timer 5";
 #endif
@@ -1719,7 +1719,7 @@ namespace ORB_SLAM2 {
         return true;
     }
 
-    bool Tracking::neoTrackWithMotionModel(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth)
+    bool Tracking::neoTrackWithMotionModel(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth, FrameLog & frameLog)
     {
         ORBmatcher matcher(0.9,true);
 
@@ -1778,7 +1778,7 @@ namespace ORB_SLAM2 {
         LOG_S(INFO) << "Timer 4";
 #endif
 
-        drawPointsWrap(neodraw_inframe, nmatches, infoScore);
+        drawPointsWrap(neodraw_inframe, nmatches, infoScore, frameLog);
 #ifdef  TIME_DEBUG
         LOG_S(INFO) << "Timer 5";
 #endif
@@ -2755,7 +2755,7 @@ namespace ORB_SLAM2 {
 
     }
 
-    inline void Tracking::drawPointsWrap(vector<neodraw> & neodraw_inframe, int matches0, float  score0){
+    inline void Tracking::drawPointsWrap(vector<neodraw> & neodraw_inframe, int matches0, float  score0, FrameLog & frameLog){
         cv::Mat img_out;
         cv::Mat img_in;
 //    mImGray.copyTo(img_in);
@@ -2801,6 +2801,8 @@ namespace ORB_SLAM2 {
         cv::putText(img_out, text.str(), cv::Point(50, 50), cv::FONT_HERSHEY_COMPLEX,1.5, cv::Scalar(color_BRG[0],color_BRG[1],color_BRG[2]), 2);
         cv::imwrite(file_name.str(), img_out);
 
+        frameLog.scoreLog = score0;
+        frameLog.inliers = matches0;
 
     }
 

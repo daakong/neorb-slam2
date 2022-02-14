@@ -3,6 +3,7 @@
 //
 
 //include LOGURU stuffs
+#pragma once
 #define LOGURU_WITH_STREAMS 1
 #include "src/loguru.hpp"
 #include "armadillo"
@@ -21,7 +22,6 @@ namespace  ORB_SLAM2 {
 //    inline bool log_flag(bool flag, char success_target, int frameID);
 
 
-
     float localEntropy4uv(cv::Mat img, int u_to_entropy, int v_to_entropy);
     void computeGradImg(const cv::Mat & gray_img_in, cv::Mat & grad_img_out);
     float uvScore_uni(float entropy_in, float grad_in);
@@ -29,4 +29,12 @@ namespace  ORB_SLAM2 {
 
 }
 
+typedef struct FrameLog{
+    int idLog;
+    int inliers;
+    float scoreLog;
+    std::string timestamp_string;
+};
+
+bool saveLogFile(std::vector<FrameLog> &LogVec);
 

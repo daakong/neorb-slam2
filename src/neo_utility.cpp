@@ -134,6 +134,15 @@ namespace  ORB_SLAM2 {
         return  (entropy_in * grad_in) / 30.f;
     }
 
+}
 
-
+bool saveLogFile(std::vector<FrameLog> &LogVec){
+    std::ofstream f;
+    f.open("/home/da/log.csv");
+    f << std::fixed;
+    f << "id, number, score, time" << std::endl;
+    for(std::vector<FrameLog>::iterator iter=LogVec.begin(); iter!=LogVec.end(); iter++){
+        f << iter->idLog << "," << iter->inliers << "," << iter->scoreLog << "," << iter->timestamp_string << std::endl;
+    }
+    return 1;
 }

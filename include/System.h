@@ -36,6 +36,8 @@
 #include "ORBVocabulary.h"
 #include "Viewer.h"
 
+#include "neo_utility.h"
+
 namespace ORB_SLAM2
 {
 
@@ -73,9 +75,10 @@ public:
     cv::Mat TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
 
     //this is neorb neo track.!!
-
     cv::Mat neoTrackRGBD(const int ni, const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp, const cv::Mat &im_last,
-                         const cv::Mat &depth_last, cv::Mat & last_key_imGray);
+                         const cv::Mat &depth_last, cv::Mat & last_key_imGray, FrameLog & logInfoThisFrame);
+//    cv::Mat neoTrackRGBD(const int ni, const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp, const cv::Mat &im_last,
+//                         const cv::Mat &depth_last, cv::Mat & last_key_imGray);
     cv::Mat neoTrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
 
 
