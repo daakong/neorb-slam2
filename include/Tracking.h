@@ -38,8 +38,6 @@
 #include "MapDrawer.h"
 #include "System.h"
 
-#include "neo_utility.h"
-
 #include <mutex>
 #include <armadillo>
 
@@ -65,11 +63,13 @@ public:
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
+    cv::Mat GrabImageStereo(const int frame_n, const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp,
+                              const cv::Mat &imLastframe, const cv::Mat &imRightLastframe,
+                              cv::Mat &imgray_LastKeyframe);
     cv::Mat GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp);
     cv::Mat GrabImageRGBD(const int frame_n, const cv::Mat &imRGB, const cv::Mat &imD, const double &timestamp,
                           const cv::Mat &imLastframe, const cv::Mat &imDepthLastframe,
-                          cv::Mat &imgray_LastKeyframe,
-                          FrameLog & frameLog); // this is the neo version
+                          cv::Mat &imgray_LastKeyframe); // this is the neo version
         cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
@@ -91,7 +91,6 @@ public:
         arma::rowvec position;
         double score;
     }neodraw;
-
 
 
     // Tracking states
@@ -147,10 +146,10 @@ protected:
     void CheckReplacedInLastFrame();
     bool TrackReferenceKeyFrame();
     bool neoTrackReferenceKeyFrame(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth,
-                                   const cv::Mat & imgray_keyframe, FrameLog & frameLog);
+                                   const cv::Mat & imgray_keyframe);
     void UpdateLastFrame();
     bool TrackWithMotionModel();
-    bool neoTrackWithMotionModel(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth, FrameLog & frameLog);
+    bool neoTrackWithMotionModel(bool if_has_exframe, const cv::Mat & lastimRGB, const cv::Mat & lastimDepth);
 
 
     bool Relocalization();
@@ -251,13 +250,13 @@ protected:
     list<MapPoint*> mlpTemporalPoints;
 
     void neoRGBD_Track(bool if_has_exframe, const cv::Mat & exframe_rgb, const cv::Mat & exframe_depth,
-                       cv::Mat & ex_keyframe_gray, FrameLog & frameLog);
+                       cv::Mat & ex_keyframe_gray);
 
 
     bool neoBuildInfoMat(Frame &inFrame, bool call_from_motion_model,
                                    double& score, vector<neodraw>& neodraw_vec);
-    bool neoBuildInfoMat(bool if_has_exframe, Frame &inFrame, Frame &exFrame, bool call_from_motion_model, arma::mat & infoMat, vector<MapPointWithScore>& mp_exframe_withScore,
-                         vector<neodraw> &neodraw_vec);
+    bool neoBuildInfoMat_new(bool if_has_exframe, Frame &inFrame, Frame &exFrame, bool call_from_motion_model, arma::mat & infoMat, vector<MapPointWithScore>& mp_exframe_withScore,
+                         vector<neodraw> &neodraw_vec, int & nmatches);
 
     bool
     Computer_H_subBlock(const cv::Mat &Tcw, const arma::Row<double> &yi, arma::Mat<double> &H13,
@@ -376,8 +375,7 @@ protected:
                                   vector<MapPointWithScore> &lastMp_score, const cv::Mat & Tcw_exframe,
                                   const bool if_for_KF);
 
-    void drawPointsWrap(vector<neodraw> &neodraw_inframe, int matches0, float  score0,
-                        FrameLog & frameLog);
+    void drawPointsWrap(vector<neodraw> &neodraw_inframe, int matches0, float  score0);
 
 //    bool computeGradImg(const cv::Mat &gray_img_in, cv::Mat &grad_img_out);
 };

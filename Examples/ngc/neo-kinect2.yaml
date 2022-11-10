@@ -32,7 +32,7 @@ Camera.RGB: 1
 ThDepth: 40.0
 
 # Deptmap values factor 
-DepthMapFactor: 1000.0
+DepthMapFactor: 2500.0
 #original 5000
 
 #--------------------------------------------------------------------------------------------

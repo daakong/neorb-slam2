@@ -36,8 +36,6 @@
 #include "ORBVocabulary.h"
 #include "Viewer.h"
 
-#include "neo_utility.h"
-
 namespace ORB_SLAM2
 {
 
@@ -68,6 +66,10 @@ public:
     // Returns the camera pose (empty if tracking fails).
     cv::Mat TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp);
 
+    /// this is the neo track stereo
+    cv::Mat neoTrackStereo(const int ni, const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp,
+                   const cv::Mat &im_last, const cv::Mat &depth_last, cv::Mat & last_key_imGray);
+
     // Process the given rgbd frame. Depthmap must be registered to the RGB frame.
     // Input image: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Input depthmap: Float (CV_32F).
@@ -75,10 +77,9 @@ public:
     cv::Mat TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
 
     //this is neorb neo track.!!
+
     cv::Mat neoTrackRGBD(const int ni, const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp, const cv::Mat &im_last,
-                         const cv::Mat &depth_last, cv::Mat & last_key_imGray, FrameLog & logInfoThisFrame);
-//    cv::Mat neoTrackRGBD(const int ni, const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp, const cv::Mat &im_last,
-//                         const cv::Mat &depth_last, cv::Mat & last_key_imGray);
+                         const cv::Mat &depth_last, cv::Mat & last_key_imGray);
     cv::Mat neoTrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
 
 

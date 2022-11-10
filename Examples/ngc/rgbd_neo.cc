@@ -85,14 +85,12 @@ int main(int argc, char **argv)
     cout << "Images in the sequence: " << nImages << endl << endl;
 
 
-    vector<FrameLog> frameLogVec;
     // Main loop
     cv::Mat imRGB, imD;
     cv::Mat exframe_imRGB, exframe_imD;
     cv::Mat ex_keyframe_imGray, ex_keyframe_imD;
     for(int ni=0; ni<nImages; ni++)
     {
-        FrameLog logInfoThisFrame = {ni,-1,-1,vstrImageFilenamesRGB[ni].substr(4,vstrImageFilenamesRGB[ni].length()-8)};
         // Read image and depthmap from file
         imRGB = cv::imread(string(argv[3])+"/"+vstrImageFilenamesRGB[ni],CV_LOAD_IMAGE_UNCHANGED);
         imD = cv::imread(string(argv[3])+"/"+vstrImageFilenamesD[ni],CV_LOAD_IMAGE_UNCHANGED);
@@ -120,7 +118,7 @@ int main(int argc, char **argv)
 //            SLAM.neoTrackRGBD(imRGB, imD, tframe);
 //        }
 //        else{
-            SLAM.neoTrackRGBD(ni, imRGB, imD, tframe, exframe_imRGB, exframe_imD, ex_keyframe_imGray, logInfoThisFrame);
+            SLAM.neoTrackRGBD(ni, imRGB, imD, tframe, exframe_imRGB, exframe_imD, ex_keyframe_imGray);
 //        }
         imD.copyTo(exframe_imD);
         imRGB.copyTo(exframe_imRGB);
@@ -130,8 +128,6 @@ int main(int argc, char **argv)
 #else
         std::chrono::monotonic_clock::time_point t2 = std::chrono::monotonic_clock::now();
 #endif
-
-        frameLogVec.push_back(logInfoThisFrame);
 
         double ttrack= std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
 
@@ -166,8 +162,6 @@ int main(int argc, char **argv)
     // Save camera trajectory
     SLAM.SaveTrajectoryTUM("traj/CameraTrajectory.txt");
     SLAM.SaveKeyFrameTrajectoryTUM("traj/KeyFrameTrajectory.txt");
-
-    saveLogFile(frameLogVec);
 
     return 0;
 }

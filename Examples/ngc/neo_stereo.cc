@@ -119,9 +119,9 @@ int main(int argc, char **argv)
     cout << "Start processing sequence ..." << endl;
     cout << "Images in the sequence: " << nImages << endl << endl;
 
-    vector<float> neoScoreLog;
-
     // Main loop
+    cv::Mat exframe_imRGB, exframe_imRight;
+    cv::Mat ex_keyframe_imGray, ex_keyframe_imD;
     cv::Mat imLeft, imRight, imLeftRect, imRightRect;
     for(int ni=0; ni<nImages; ni++)
     {
@@ -160,7 +160,10 @@ int main(int argc, char **argv)
         }
         // Pass the images to the SLAM system
 //        SLAM.TrackStereo(imLeftRect,imRightRect,tframe);
-        SLAM.TrackStereo(imLeft,imRight,tframe);
+//        SLAM.TrackStereo(imLeft,imRight,tframe);
+        SLAM.neoTrackStereo(ni, imLeft,imRight,tframe,exframe_imRGB, exframe_imRight, ex_keyframe_imGray);
+        imLeft.copyTo(exframe_imRGB);
+        imRight.copyTo(exframe_imRight);
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
